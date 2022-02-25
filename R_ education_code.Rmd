@@ -1,0 +1,1534 @@
+---
+title: "Econometrics Project"
+author: "Navya Sureka"
+date: "29/0/2021"
+output: pdf_document
+header-includes:
+- \usepackage{rotating, graphicx}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = F, message = F)
+```
+
+```{r packages2, echo=F, include = FALSE}
+list.of.packages <- c("tidyverse", "haven", "psych", "knitr","broom", "descr", "ivpack", "plotrix", "kableExtra","stargazer", "ggplot2", "matrixStats","scales","spatstat", "lfe","plm")
+
+library()
+
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages, repos = "http://cran.us.r-project.org")
+
+invisible(lapply(list.of.packages, library, character.only = TRUE))
+```
+
+# 1. Introduction and literature review
+
+
+
+```{r}
+df <- read_dta("selected.dta")
+
+```
+
+
+
+```{r}
+# CLEAN DATASET AND CREATE VARIABLES
+
+
+df_clean <- df %>% 
+  mutate(X_RACETH_R = na_if(X_RACETH_R, -9),   # only 43 not ascertained 
+         white = ifelse(X_RACETH_R == 1, 1, 0),
+         black = ifelse(X_RACETH_R == 2, 1, 0),
+         hispanic = ifelse(X_RACETH_R == 3 | X_RACETH_R == 4, 1, 0),
+         asian = ifelse(X_RACETH_R == 5, 1, 0),
+         other = ifelse(X_RACETH_R == 6 | X_RACETH_R == 7 | X_RACETH_R == 8, 1, 0)) %>% 
+  mutate(X_CHSEX_R = na_if(X_CHSEX_R, -9), 
+         female = ifelse(X_CHSEX_R == 2, 1, 
+                        ifelse(X_CHSEX_R == 1, 0, X_CHSEX_R))) %>% 
+     mutate( X1MSCALK5= na_if(X1MSCALK5, -9))%>%
+     mutate( X2MSCALK5= na_if(X2MSCALK5, -9))%>%
+     mutate( X3MSCALK5= na_if(X3MSCALK5, -9))%>%
+     mutate( X4MSCALK5= na_if(X4MSCALK5, -9))%>%
+     mutate( X5MSCALK5= na_if(X5MSCALK5, -9))%>%
+     mutate( X6MSCALK5= na_if(X6MSCALK5, -9))%>%
+     mutate( X7MSCALK5= na_if(X7MSCALK5, -9))%>%
+     mutate( X8MSCALK5= na_if(X8MSCALK5, -9))%>%
+     mutate( X9MSCALK5= na_if(X9MSCALK5, -9))%>%
+     mutate( X1RSCALK5= na_if(X1RSCALK5, -9))%>%
+     mutate( X2RSCALK5= na_if(X2RSCALK5, -9))%>%
+     mutate( X3RSCALK5= na_if(X3RSCALK5, -9))%>%
+     mutate( X4RSCALK5= na_if(X4RSCALK5, -9))%>%
+     mutate( X5RSCALK5= na_if(X5RSCALK5, -9))%>%
+     mutate( X6RSCALK5= na_if(X6RSCALK5, -9))%>%
+     mutate( X7RSCALK5= na_if(X7RSCALK5, -9))%>%
+     mutate( X8RSCALK5= na_if(X8RSCALK5, -9))%>%
+     mutate( X9RSCALK5= na_if(X9RSCALK5, -9))%>%
+     mutate( X2SSCALK5= na_if(X2SSCALK5, -9))%>%
+     mutate( X3SSCALK5= na_if(X3SSCALK5, -9))%>%
+     mutate( X4SSCALK5= na_if(X4SSCALK5, -9))%>%
+     mutate( X5SSCALK5= na_if(X5SSCALK5, -9))%>%
+     mutate( X6SSCALK5= na_if(X6SSCALK5, -9))%>%
+     mutate( X7SSCALK5= na_if(X7SSCALK5, -9))%>%
+     mutate( X8SSCALK5= na_if(X8SSCALK5, -9))%>%
+     mutate( X9SSCALK5= na_if(X9SSCALK5, -9))%>%
+    mutate( X12SESL= na_if(X9SSCALK5, -9))%>%
+  mutate(math_kg_spring = (X2MSCALK5- weighted.mean(X2MSCALK5,W1C0, na.rm=T))/weightedSd(X2MSCALK5,W1C0, na.rm=T),
+         math_1st_spring = (X4MSCALK5- weighted.mean(X4MSCALK5,W4CS4P_20, na.rm=T ))/weightedSd(X4MSCALK5,W4CS4P_20, na.rm=T),
+         math_3rd_spring = (X7MSCALK5- weighted.mean(X7MSCALK5,W7C7P_20 , na.rm=T ))/weightedSd(X7MSCALK5, W7C7P_20 , na.rm=T),
+         math_5th_spring = (X9MSCALK5- weighted.mean(X9MSCALK5,W9C9P_20 , na.rm=T))/weightedSd(X9MSCALK5,W9C9P_20 , na.rm=T)) %>% 
+  
+   mutate(reading_kg_spring = (X2RSCALK5- weighted.mean(X2RSCALK5,W1C0, na.rm=T))/weightedSd(X2RSCALK5,W1C0, na.rm=T),
+         reading_1st_spring = (X4RSCALK5- weighted.mean(X4RSCALK5,W4CS4P_20, na.rm=T ))/weightedSd(X4RSCALK5,W4CS4P_20, na.rm=T),
+         reading_3rd_spring = (X7RSCALK5- weighted.mean(X7RSCALK5,W7C7P_20 , na.rm=T ))/weightedSd(X7RSCALK5, W7C7P_20 , na.rm=T),
+         reading_5th_spring = (X9RSCALK5- weighted.mean(X9RSCALK5,W9C9P_20 , na.rm=T))/weightedSd(X9RSCALK5,W9C9P_20 , na.rm=T)) %>% 
+  
+  mutate(science_kg_spring = (X2SSCALK5- weighted.mean(X2SSCALK5,W1C0, na.rm=T))/weightedSd(X2SSCALK5,W1C0, na.rm=T),
+         science_1st_spring = (X4SSCALK5- weighted.mean(X4SSCALK5,W4CS4P_20, na.rm=T ))/weightedSd(X4SSCALK5,W4CS4P_20, na.rm=T),
+         science_3rd_spring = (X7SSCALK5- weighted.mean(X7SSCALK5,W7C7P_20 , na.rm=T ))/weightedSd(X7SSCALK5, W7C7P_20 , na.rm=T),
+         science_5th_spring = (X9SSCALK5- weighted.mean(X9SSCALK5,W9C9P_20 , na.rm=T))/weightedSd(X9SSCALK5,W9C9P_20 , na.rm=T)) %>% 
+
+  mutate(MOMOVER30 = ifelse(P1OLDMOM>30 , 1 , 0),
+         MOMTEEN = ifelse(P1OLDMOM<20 , 1 , 0),
+         BIRTH_WEIGHT = ifelse(is.na(P1WEIGHO), P2WEIGHO , P1WEIGHO),
+         WIC = ifelse(is.na(P1WICMOM), P2WICMOM , P1WICMOM),
+         booksqr = P1CHLDBK^2) %>% 
+  mutate(X2KRCETH = na_if(X2KRCETH, -9),
+         X2KRCETH = na_if(X2KRCETH, -1),
+         X4RCETH = na_if(X4RCETH, -9),
+         X4RCETH =  na_if(X4RCETH, -1),
+         X6RCETH = na_if(X6RCETH, -9),
+         X6RCETH =  na_if(X6RCETH, -1),
+         X7RCETH_R = na_if(X7RCETH_R, -9),
+         X7RCETH_R = na_if(X7RCETH_R, -1),
+         X8RCETH =  na_if(X8RCETH, -9),
+         X8RCETH = na_if(X8RCETH, -1),
+         X9RCETH = na_if(X9RCETH, -9),
+         X9RCETH = na_if(X9RCETH, -1)) %>% 
+  mutate(single_parent_X1 = ifelse(X1HPARNT==3, 1, 0),
+         single_parent_X2 = ifelse(X2HPARNT==3, 1, 0),
+         single_parent_X4 = ifelse(X4HPARNT==3, 1, 0),
+         single_parent_X6 = ifelse(X6HPARNT==3, 1, 0),
+         single_parent_X7 = ifelse(X7HPARNT==3, 1, 0),
+         single_parent_X8 = ifelse(X8HPARNT==3, 1, 0),
+         single_parent_X9 = ifelse(X9HPARNT==3, 1, 0)) %>% 
+  mutate(math_diff_1st_kg = math_1st_spring - math_kg_spring,
+         math_diff_3rd_1st = math_3rd_spring - math_1st_spring,
+         math_diff_5th_3rd = math_5th_spring - math_3rd_spring,
+         math_diff_3rd_kg = math_3rd_spring - math_kg_spring,
+         math_diff_5th_kg = math_5th_spring - math_kg_spring,
+         reading_diff_1st_kg = reading_1st_spring - reading_kg_spring,
+         reading_diff_3rd_1st = reading_3rd_spring - reading_1st_spring,
+         reading_diff_5th_3rd = reading_5th_spring - reading_3rd_spring,
+         reading_diff_5th_kg = reading_5th_spring - reading_kg_spring,
+         reading_diff_3rd_kg = reading_3rd_spring - reading_kg_spring,
+         science_diff_1st_kg = science_1st_spring - science_kg_spring,
+         science_diff_3rd_1st = science_3rd_spring - science_1st_spring,
+         science_diff_5th_3rd = science_5th_spring - science_3rd_spring,
+         science_diff_3rd_kg = science_3rd_spring - science_kg_spring,
+         science_diff_5th_kg = science_5th_spring - science_kg_spring
+         ) %>% 
+#select(c(1:3,6,4,7,5,8:295)) %>%    # adjust column positions for school ID
+  mutate_at(vars(S1_ID:S9_ID), funs(as.numeric)) %>%    # mutate to numeric so that NAs appear rather than blank spaces 
+  mutate(dummy_math_X9 = ifelse(is.na(X9MSCALK5), 1, 0),
+         dummy_reading_X9 = ifelse(is.na(X9RSCALK5), 1, 0),
+         dummy_science_X9 = ifelse(is.na(X9SSCALK5), 1, 0)) %>% 
+  mutate(change_school = ifelse(S2_ID != S4_ID | S4_ID != S7_ID | S7_ID != S9_ID, 1, 0)) %>% 
+  mutate(assess_X2 = (X2TCHAPP + X2TCHCON + X2TCHPER + X2TCHEXT + X2TCHINT)/5,    # average score in assessment
+         assess_X4 = (X4TCHAPP + X4TCHCON + X4TCHPER + X4TCHEXT + X4TCHINT)/5,
+         assess_X7 = (X7TCHAPP + X7TCHCON + X7TCHPER + X7TCHEXT + X7TCHINT)/5,
+         assess_X9 = (X9TCHAPP + X9TCHCON + X9TCHPER + X9TCHEXT + X9TCHINT)/5) %>% 
+  mutate(prc_black_teachers_X2 = ifelse(S2BLACP2 == -9, NA, S2BLACP2),
+         prc_black_teachers_X4 = ifelse(S4BLACP2 == -9, NA, S4BLACP2)) %>%
+  mutate(black_above30_X2 = ifelse(prc_black_teachers_X2 >= 30, 1, 0),
+         black_above30_X4 = ifelse(prc_black_teachers_X4 >= 30, 1, 0)) %>% 
+  write_dta("df_clean.dta")
+
+
+df_clean <- df_clean %>% 
+    mutate(black_with_white = ifelse(black == 1 & (X2PAR1RAC == 1 | X2PAR2RAC == 1), 1, 0)) %>% 
+    mutate(black_with_black = ifelse(black == 1 & (X2PAR1RAC == 2 | X2PAR2RAC == 2), 1, 0 )) %>%
+    mutate(na.kg= ifelse (is.na(science_kg_spring), 1,0)) %>%
+  mutate(na.1st= ifelse (is.na(science_1st_spring), 1,0)) %>%
+  mutate(na.3rd= ifelse (is.na(science_3rd_spring), 1,0)) %>%
+  mutate(na.5th= ifelse (is.na(science_5th_spring), 1,0)) %>%
+  mutate(na.all=ifelse(na.kg==1 & na.1st==1 & na.3rd==1 & na.5th==1, 1,0))%>%
+  mutate(na.3_5=ifelse( na.kg==0 & na.1st==0 & na.3rd==1 & na.5th==1, 1,0)) %>%
+  mutate(na.only_5=ifelse( na.kg==0 & na.1st==0 & na.3rd==0 & na.5th==1, 1,0)) %>%
+  mutate(na.except_kg=ifelse( na.kg==0 & na.3rd==1 & na.1st==1 & na.5th==1, 1,0))
+  
+
+kg<-df_clean %>%
+  filter(na.kg ==0 & na.1st ==1 & na.3rd==1 & na.5th==1)
+kg_1st<- df_clean %>%
+  filter(na.kg ==0 & na.1st ==0 & na.3rd==1 & na.5th==1 )
+kg_1st_3rd<-  df_clean %>%
+  filter(na.kg ==0 & na.1st ==0 & na.3rd==0 & na.5th==1)
+kg_1st_3rd_5th<-  df_clean %>%
+  filter(na.kg ==0 & na.1st ==0 & na.3rd==0 & na.5th==0)
+
+a <-  lm(science_kg_spring ~ black + hispanic + asian + other, data= kg_1st, weights = W1C0)
+b <-  lm(science_1st_spring ~ black + hispanic + asian + other, data= kg_1st, weights = W4CS4P_20)
+a1 <- lm(reformulate(vector_controls_X2, "science_kg_spring"), kg_1st, weights = W1C0)
+b1 <- lm(reformulate(vector_controls_X4, "science_1st_spring"), kg_1st, weights = W4CS4P_20)
+
+c<- lm(science_kg_spring ~ black + hispanic + asian + other, data= kg_1st_3rd, weights = W1C0)
+d<- lm(science_1st_spring ~ black + hispanic + asian + other, data= kg_1st_3rd, weights = W4CS4P_20)
+e<- lm(science_3rd_spring ~ black + hispanic + asian + other, data= kg_1st_3rd, weights = W7C7P_20)
+
+c1 <- lm(reformulate(vector_controls_X2, "science_kg_spring"), kg_1st_3rd, weights = W1C0)
+d1 <- lm(reformulate(vector_controls_X4, "science_1st_spring"), kg_1st_3rd, weights = W4CS4P_20)
+e1 <- lm(reformulate(vector_controls_X7, "science_3rd_spring"), kg_1st_3rd, weights = W7C7P_20)
+
+f<- lm(science_kg_spring ~ black + hispanic + asian + other, data= kg_1st_3rd_5th, weights = W1C0)
+g<- lm(science_1st_spring ~ black + hispanic + asian + other, data= kg_1st_3rd_5th, weights = W4CS4P_20)
+h<- lm(science_3rd_spring ~ black + hispanic + asian + other, data= kg_1st_3rd_5th, weights = W7C7P_20)
+i<- lm(science_5th_spring ~ black + hispanic + asian + other, data= science_att, weights = W9C9P_20)
+
+f1 <- lm(reformulate(vector_controls_X2, "science_kg_spring"), kg_1st_3rd_5th, weights = W1C0)
+g1 <- lm(reformulate(vector_controls_X4, "science_1st_spring"), kg_1st_3rd_5th, weights = W4CS4P_20)
+h1 <- lm(reformulate(vector_controls_X7, "science_3rd_spring"), kg_1st_3rd_5th, weights = W7C7P_20)
+i1<- lm(reformulate(vector_controls_X9, "science_5th_spring"),kg_1st_3rd_5th, weights = W9C9P_20)
+
+
+
+
+graph <- data.frame("Grade" = c("spring kg", "spring 1st", "spring kg", "spring 1st", "spring kg", "spring 1st","spring 3rd", "spring kg", "spring 1st","spring 3rd", "spring kg", "spring 1st","spring 3rd", "spring 5th", "spring kg", "spring 1st","spring 3rd" , "spring 5th"),
+                          "Data"=c("KG-1st","KG-1st", "KG-1st", "KG-1st", "KG-3rd", "KG-3rd","KG-3rd","KG-3rd","KG-3rd","KG-3rd","KG-5th","KG-5th","KG-5th","KG-5th","KG-5th","KG-5th","KG-5th","KG-5th"),
+                           "Type" = c("Base", "Base", "Control","Control", "Base", "Base","Base", "Control","Control","Control", "Base", "Base", "Base", "Base","Control", "Control","Control","Control"),
+                          "Estimate" = c(summary(a)$coefficient[2,1],
+                                              summary(b)$coefficient[2,1],
+                                         summary(a1)$coefficient[2,1],
+                                                  summary(b1)$coefficient[2,1],
+                                                  summary(c)$coefficient[2,1],
+                                                  summary(d)$coefficient[2,1],
+                                         summary(e)$coefficient[2,1],
+                                              summary(c1)$coefficient[2,1],
+                                              summary(d1)$coefficient[2,1],
+                                              summary(e1)$coefficient[2,1],
+                                         summary(f)$coefficient[2,1],
+                                                  summary(g)$coefficient[2,1],
+                                                  summary(h)$coefficient[2,1],
+                                                  summary(i)$coefficient[2,1],
+                                         summary(f1)$coefficient[2,1],
+                                              summary(g1)$coefficient[2,1],
+                                              summary(h1)$coefficient[2,1],
+                                              summary(i1)$coefficient[2,1]),
+                          "SE" = c(summary(a)$coefficient[2,2],
+                                              summary(b)$coefficient[2,2],
+                                         summary(a1)$coefficient[2,2],
+                                                  summary(b1)$coefficient[2,2],
+                                                  summary(c)$coefficient[2,2],
+                                                  summary(d)$coefficient[2,2],
+                                         summary(e)$coefficient[2,2],
+                                              summary(c1)$coefficient[2,2],
+                                              summary(d1)$coefficient[2,2],
+                                              summary(e1)$coefficient[2,2],
+                                         summary(f)$coefficient[2,2],
+                                                  summary(g)$coefficient[2,2],
+                                                  summary(h)$coefficient[2,2],
+                                                  summary(i)$coefficient[2,2],
+                                         summary(f1)$coefficient[2,2],
+                                              summary(g1)$coefficient[2,2],
+                                              summary(h1)$coefficient[2,2],
+                                              summary(i1)$coefficient[2,2]), check.rows = FALSE , check.names = FALSE
+                                          )
+
+mytheme <- theme_minimal()+ theme(text = element_text(family="LM Roman 10"), axis.title = element_text(size=10),
+                                  plot.title= element_text(size=11,face = "bold"), 
+                                  plot.subtitle = element_text(size=11),
+                                  legend.title =element_text(size=11))
+level_order <- c("spring kg", "spring 1st", "spring 3rd", "spring 5th")
+plot_1 <- ggplot(graph, aes(y=Estimate, x=factor(Grade, level = level_order), group=interaction(Data,Type), colour=Type)) + 
+  geom_point() + geom_line() +
+  geom_errorbar(aes(ymin=Estimate-SE, ymax=Estimate+SE), width=.1) + 
+  labs(
+       y="Average gap compared to white students",
+       x="Grade",
+       colour ="Type") + theme_light() + scale_y_continuous(breaks = seq(0.2,-1, by=-0.1)) +
+  scale_colour_manual(name = "Regressions:", labels = c("Base","Controlling for covariates"),
+                      values = c("tomato2","dodgerblue3","green4")) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +  facet_wrap(~Data) +  theme(legend.position = "bottom")  + 
+      theme(strip.text.x = element_text(size = 8, colour = "black"))
+
+plot_1
+
+ggsave(file=file.path(paste0("Attrition-sciences",".pdf")), plot_1,
+      width = 28, height = 10,
+      units =  "cm")
+
+mean(kg$female,na.rm=T )
+mean(kg_1st$female ,na.rm=T )
+mean(kg_1st_3rd$female ,na.rm=T )
+mean(kg_1st_3rd_5th$female ,na.rm=T )
+mean(math_att$female ,na.rm=T )
+
+mean(kg$white ,na.rm=T )
+mean(kg_1st$white ,na.rm=T )
+mean(kg_1st_3rd$white ,na.rm=T )
+mean(kg_1st_3rd_5th$white ,na.rm=T )
+mean(math_att$white)
+
+mean(kg$black,na.rm=T )
+mean(kg_1st$black ,na.rm=T )
+mean(kg_1st_3rd$black ,na.rm=T )
+mean(kg_1st_3rd_5th$black ,na.rm=T )
+mean(math_att$black)
+
+
+mean(kg$asian,na.rm=T )
+mean(kg_1st$asian,na.rm=T )
+mean(kg_1st_3rd$asian,na.rm=T )
+mean(kg_1st_3rd_5th$asian,na.rm=T )
+mean(math_att$asian)
+
+mean(kg$hispanic,na.rm=T )
+mean(kg_1st$hispanic,na.rm=T )
+mean(kg_1st_3rd$hispanic,na.rm=T )
+mean(kg_1st_3rd_5th$hispanic,na.rm=T )
+mean(math_att$hispanic)
+
+mean(kg$other,na.rm=T )
+mean(kg_1st$other,na.rm=T )
+mean(kg_1st_3rd$other,na.rm=T )
+mean(kg_1st_3rd_5th$other,na.rm=T )
+mean(math_att$other)
+
+all<- df_clean %>%
+  filter(na.all==1)
+except_kg<-df_clean %>%
+  filter(na.except_kg==1)
+missing35<- df_clean %>%
+  filter(na.3_5==1)
+missing5<- df_clean %>%
+  filter(na.only_5==1)
+  
+sum(df_clean$na.kg)
+sum(df_clean$na.1st)
+sum(df_clean$na.3rd)
+sum(df_clean$na.5th)
+sum(df_clean$na.kg_1==1)
+sum(df_clean$na.3_1==1)
+
+sum(math_att$na.kg)
+sum(math_att$na.1st)
+sum(math_att$na.3rd)
+sum(math_att$na.5th)
+
+# testing differences in black children with white and black parents 
+t.test(df_clean[df_clean$black_with_white == 1,]$math_1st_spring, df_clean[df_clean$black_with_black == 1,]$math_1st_spring )
+
+
+
+# teacher assessments
+#X2TCHAPP, X2TCHCON, X2TCHPER, X2TCHEXT, X2TCHINT, 
+#X4TCHAPP, X4TCHCON, X4TCHPER, X4TCHEXT, X4TCHINT, 
+#X7TCHAPP, X7TCHCON, X7TCHPER, X7TCHEXT, X7TCHINT, X7TWKMEM, 
+#X9TCHAPP, X9TCHCON, X9TCHPER, X9TCHEXT, X9TCHINT
+
+
+
+```
+
+
+```{r}
+
+## ATTRITION
+## CONTROL INDEPENDENCE OF MISSING VALUES 
+
+test <- df_clean %>% 
+  mutate(dummy_math_X9 = ifelse(is.na(X9MSCALK5), 1, 0),
+         dummy_math_X9 = ifelse(is.na(X9RSCALK5), 1, 0),
+         dummy_science_X9 = ifelse(is.na(X9SSCALK5), 1, 0)
+         )
+
+summary(lm(dummy_math_X9 ~ math_kg_spring, test))
+cor(test$dummy_math_X9, test$math_kg_spring)
+summary(lm(dummy_math_X9 ~ X2MSCALK5, test))
+summary(lm(dummy_math_X9 ~ X4MSCALK5, test))
+summary(lm(dummy_math_X9 ~ X7MSCALK5, test))  # strong impact of low grade in x2 as predictor of missing value in x9
+summary(lm(dummy_math_X9 ~ X12SESL, test)) 
+summary(lm(dummy_math_X9 ~ black, test)) 
+summary(lm(dummy_math_X9 ~ white, test)) 
+summary(lm(dummy_math_X9 ~ single_parent_X2, test)) 
+
+summary(lm(dummy_math_X9 ~ X2RSCALK5, test))
+summary(lm(dummy_math_X9 ~ X12SESL, test))
+summary(lm(dummy_reading_X9 ~ black, test))
+
+missing <- df_clean %>% 
+  summarise_all(funs(mean(!is.na(.))))
+
+school <- df_clean %>% 
+  filter(S2_ID == S4_ID) %>% 
+  filter(S4_ID == S7_ID) %>% 
+  filter(S7_ID == S9_ID) 
+
+
+
+## IS CHANGING SCHOOL RANDOM? No
+
+summary(lm(dummy_math_X9 ~ change_school, data = df_clean))
+summary(lm(dummy_reading_X9 ~ change_school, data = df_clean))
+summary(lm(dummy_science_X9 ~ change_school, data = df_clean))
+
+summary(lm(change_school ~ X12SESL, data = school_change))
+summary(lm(change_school ~ math_kg_spring, df_clean))
+summary(lm(change_school ~ black, df_clean))
+
+
+test <- df_clean %>% 
+  group_by(S4_ID, S7_ID, S9_ID) %>% 
+  mutate(dummy = ifelse(!is.na(X4MSCALK5), 1, 0)) %>% 
+  summarise(dummy = sum(dummy)) %>% 
+  filter(dummy != 0)
+
+## Main Subsample that we are working on
+### SUBSET SAMPLE : keep only the observations for which we have few missing score values 
+
+math_att <- df_clean %>% 
+  filter(!is.na(X2MSCALK5) & !is.na(X4MSCALK5)  & !is.na(X7MSCALK5)   & !is.na(X9MSCALK5)
+ & !is.na(X2RSCALK5) & !is.na(X4RSCALK5)  & !is.na(X7RSCALK5)   & !is.na(X9RSCALK5) & !is.na(X2SSCALK5) & !is.na(X4SSCALK5)  & !is.na(X7SSCALK5)   & !is.na(X9SSCALK5) & !is.na(black) & !is.na(hispanic) & !is.na(asian) & !is.na( other) & !is.na(X2KAGE_R) & !is.na(X2KAGE_R)& !is.na(X4AGE)& !is.na(X7AGE)& !is.na(X9AGE)& !is.na(BIRTH_WEIGHT) & !is.na(female) & !is.na(P1CHLDBK)& !is.na(booksqr) & !is.na(MOMOVER30) & !is.na(X12SESL)& !is.na(WIC) & !is.na(MOMTEEN))
+
+reading_att <- df_clean %>% 
+  filter(!is.na(X2MSCALK5) & !is.na(X4MSCALK5)  & !is.na(X7MSCALK5)   & !is.na(X9MSCALK5)
+ & !is.na(X2RSCALK5) & !is.na(X4RSCALK5)  & !is.na(X7RSCALK5)   & !is.na(X9RSCALK5) & !is.na(X2SSCALK5) & !is.na(X4SSCALK5)  & !is.na(X7SSCALK5)   & !is.na(X9SSCALK5) & !is.na(black) & !is.na(hispanic) & !is.na(asian) & !is.na( other) & !is.na(X2KAGE_R) & !is.na(X2KAGE_R)& !is.na(X4AGE)& !is.na(X7AGE)& !is.na(X9AGE)& !is.na(BIRTH_WEIGHT) & !is.na(female) & !is.na(P1CHLDBK)& !is.na(booksqr) & !is.na(MOMOVER30) & !is.na(X12SESL)& !is.na(WIC) & !is.na(MOMTEEN))
+
+science_att <- df_clean %>% 
+  filter(!is.na(X2MSCALK5) & !is.na(X4MSCALK5)  & !is.na(X7MSCALK5)   & !is.na(X9MSCALK5)
+ & !is.na(X2RSCALK5) & !is.na(X4RSCALK5)  & !is.na(X7RSCALK5)   & !is.na(X9RSCALK5) & !is.na(X2SSCALK5) & !is.na(X4SSCALK5)  & !is.na(X7SSCALK5)   & !is.na(X9SSCALK5) & !is.na(black) & !is.na(hispanic) & !is.na(asian) & !is.na( other) & !is.na(X2KAGE_R) & !is.na(X2KAGE_R)& !is.na(X4AGE)& !is.na(X7AGE)& !is.na(X9AGE)& !is.na(BIRTH_WEIGHT) & !is.na(female) & !is.na(P1CHLDBK)& !is.na(booksqr) & !is.na(MOMOVER30) & !is.na(X12SESL)& !is.na(WIC) & !is.na(MOMTEEN))
+
+
+missing_attrition <- math_att %>% 
+  summarise_all(funs(mean(!is.na(.))))
+```
+
+# 2.Data and Descriptive statistics
+
+
+```{r, include=F}
+# DESCRIPTIVE STATISTICS
+
+math_kg_spring_w <-  lm(math_kg_spring ~ 1, data = math_att[math_att$white == 1,], weights = W1C0)
+math_1st_spring_w <- lm(math_1st_spring ~ 1, data = math_att[math_att$white == 1,], weights = W4CS4P_20)
+math_3rd_spring_w <- lm(math_3rd_spring ~ 1, data = math_att[math_att$white == 1,], weights = W7C7P_20)
+math_5th_spring_w <- lm(math_5th_spring ~ 1, data = math_att[math_att$white == 1,], weights = W9C9P_20)
+    
+
+math_kg_spring_b <-  lm(math_kg_spring ~ 1, data = math_att[math_att$black == 1,], weights = W1C0)
+math_1st_spring_b <-  lm(math_1st_spring ~ 1, data = math_att[math_att$black == 1,], weights = W4CS4P_20)
+math_3rd_spring_b <-  lm(math_3rd_spring ~ 1, data = math_att[math_att$black == 1,], weights = W7C7P_20)
+math_5th_spring_b <- lm(math_5th_spring ~ 1, data = math_att[math_att$black == 1,], weights = W9C9P_20)
+
+
+math_kg_spring_h <-  lm(math_kg_spring ~ 1, data = math_att[math_att$hispanic == 1,], weights = W1C0)
+math_1st_spring_h <-  lm(math_1st_spring ~ 1, data = math_att[math_att$hispanic == 1,], weights = W4CS4P_20)
+math_3rd_spring_h <-  lm(math_3rd_spring ~ 1, data = math_att[math_att$hispanic == 1,], weights = W7C7P_20)
+math_5th_spring_h <- lm(math_5th_spring ~ 1, data = math_att[math_att$hispanic == 1,], weights = W9C9P_20)
+
+
+math_kg_spring_a <-  lm(math_kg_spring ~ 1, data = math_att[math_att$asian == 1,], weights = W1C0)
+math_1st_spring_a <- lm(math_1st_spring ~ 1, data = math_att[math_att$asian == 1,], weights = W4CS4P_20)
+math_3rd_spring_a <-  lm(math_3rd_spring ~ 1, data = math_att[math_att$asian == 1,], weights = W7C7P_20)
+math_5th_spring_a <- lm(math_5th_spring ~ 1, data = math_att[math_att$asian == 1,], weights = W9C9P_20)
+
+math_kg_spring_f <-  lm(math_kg_spring ~ 1, data = math_att, weights = W1C0)
+math_1st_spring_f <- lm(math_1st_spring ~ 1, data = math_att, weights = W4CS4P_20)
+math_3rd_spring_f <-  lm(math_3rd_spring ~ 1, data = math_att, weights = W7C7P_20)
+math_5th_spring_f <- lm(math_5th_spring ~ 1, data = math_att, weights = W9C9P_20)
+
+white_w <-  lm(white ~ 1, data = math_att[math_att$white == 1,])
+white_b <-  lm(white ~ 1, data = math_att[math_att$black == 1,])
+white_h <-  lm(white ~ 1, data = math_att[math_att$hispanic == 1,])
+white_a <-  lm(white ~ 1, data = math_att[math_att$asian == 1,])
+white_f <-  lm(white ~ 1, data = math_att)
+
+
+black_w <-  lm(black ~ 1, data = math_att[math_att$white == 1,])
+black_b <-  lm(black ~ 1, data = math_att[math_att$black == 1,])
+black_h <-  lm(black ~ 1, data = math_att[math_att$hispanic == 1,])
+black_a <-  lm(black ~ 1, data = math_att[math_att$asian == 1,])
+black_f <-  lm(black ~ 1, data = math_att)
+
+hispanic_w <-  lm(hispanic ~ 1, data = math_att[math_att$white == 1,])
+hispanic_b <-  lm(hispanic ~ 1, data = math_att[math_att$black == 1,])
+hispanic_h <-  lm(hispanic ~ 1, data = math_att[math_att$hispanic == 1,])
+hispanic_a <-  lm(hispanic ~ 1, data = math_att[math_att$asian == 1,])
+hispanic_f <-  lm(hispanic ~ 1, data = math_att)
+
+asian_w <-  lm(asian ~ 1, data = math_att[math_att$white == 1,])
+asian_b <-  lm(asian ~ 1, data = math_att[math_att$black == 1,])
+asian_h <-  lm(asian ~ 1, data = math_att[math_att$hispanic == 1,])
+asian_a <-  lm(asian ~ 1, data = math_att[math_att$asian == 1,])
+asian_f <-  lm(asian ~ 1, data = math_att)
+
+
+female_f <- lm(female ~ 1, math_att)
+female_w <- lm(female ~ 1, math_att[math_att$white == 1,])
+female_b <- lm(female ~ 1, math_att[math_att$black == 1,])
+female_h <- lm(female ~ 1, math_att[math_att$hispanic == 1,])
+female_a <- lm(female ~ 1, math_att[math_att$asian == 1,])
+
+
+
+# SCIENCE SUBSAMPLE 
+
+
+
+stargazer(math_kg_spring_f, math_kg_spring_w, math_kg_spring_b, math_kg_spring_h,math_kg_spring_a)
+stargazer(math_1st_spring_f, math_1st_spring_w, math_1st_spring_b, math_1st_spring_h,math_1st_spring_a)
+stargazer(math_3rd_spring_f, math_3rd_spring_w, math_3rd_spring_b, math_3rd_spring_h,math_3rd_spring_a)
+stargazer(math_5th_spring_f, math_5th_spring_w, math_5th_spring_b, math_5th_spring_h,math_5th_spring_a)
+stargazer(reading_kg_spring_f, reading_kg_spring_w, reading_kg_spring_b, reading_kg_spring_h,reading_kg_spring_a)
+stargazer(reading_1st_spring_f, reading_1st_spring_w, reading_1st_spring_b, reading_1st_spring_h,reading_1st_spring_a)
+stargazer(reading_3rd_spring_f, reading_3rd_spring_w, reading_3rd_spring_b, reading_3rd_spring_h,reading_3rd_spring_a)
+stargazer(reading_5th_spring_f, reading_5th_spring_w, reading_5th_spring_b, reading_5th_spring_h,reading_5th_spring_a)
+stargazer(science_kg_spring_f, science_kg_spring_w, science_kg_spring_b, science_kg_spring_h,science_kg_spring_a)
+stargazer(science_1st_spring_f, science_1st_spring_w, science_1st_spring_b, science_1st_spring_h,science_1st_spring_a)
+stargazer(science_3rd_spring_f, science_3rd_spring_w, science_3rd_spring_b, science_3rd_spring_h,science_3rd_spring_a)
+stargazer(science_5th_spring_f, science_5th_spring_w, science_5th_spring_b, science_5th_spring_h,science_5th_spring_a)
+stargazer(white_f,white_w,white_b,white_h,white_a)
+stargazer(black_f,black_w,black_b,black_h,black_a)
+stargazer(hispanic_f,hispanic_w,hispanic_b,hispanic_h,hispanic_a)
+stargazer(asian_f,asian_w,asian_b,asian_h,asian_a)
+stargazer(female_f,female_w,female_b,female_h,female_a)
+
+
+
+
+```
+
+
+
+
+```{r}
+
+## Reading 
+## Reading 
+
+reading_kg_spring_w <-  lm(reading_kg_spring ~ 1, data = reading_att[reading_att$white == 1,], weights = W1C0)
+reading_1st_spring_w <-  lm(reading_1st_spring ~ 1, data = reading_att[reading_att$white == 1,], weights = W4CS4P_20)
+reading_3rd_spring_w <-  lm(reading_3rd_spring ~ 1, data = reading_att[reading_att$white == 1,], weights = W7C7P_20)
+reading_5th_spring_w <- lm(reading_5th_spring ~ 1, data = reading_att[reading_att$white == 1,], weights = W9C9P_20)
+    
+reading_kg_spring_b <-  lm(reading_kg_spring ~ 1, data = reading_att[reading_att$black == 1,], weights = W1C0)
+reading_1st_spring_b <-  lm(reading_1st_spring ~ 1, data = reading_att[reading_att$black == 1,], weights = W4CS4P_20)
+reading_3rd_spring_b <-  lm(reading_3rd_spring ~ 1, data = reading_att[reading_att$black == 1,], weights = W7C7P_20)
+reading_5th_spring_b <- lm(reading_5th_spring ~ 1, data = reading_att[reading_att$black == 1,], weights = W9C9P_20)
+
+
+reading_kg_spring_h <-  lm(reading_kg_spring ~ 1, data = reading_att[reading_att$hispanic == 1,], weights = W1C0)
+reading_1st_spring_h <-  lm(reading_1st_spring ~ 1, data = reading_att[reading_att$hispanic == 1,], weights = W4CS4P_20)
+reading_3rd_spring_h <-  lm(reading_3rd_spring ~ 1, data = reading_att[reading_att$hispanic == 1,], weights = W7C7P_20)
+reading_5th_spring_h <- lm(reading_5th_spring ~ 1, data = reading_att[reading_att$hispanic == 1,], weights = W9C9P_20)
+
+
+reading_kg_spring_a <-  lm(reading_kg_spring ~ 1, data = reading_att[reading_att$asian == 1,], weights = W1C0)
+reading_1st_spring_a <-  lm(reading_1st_spring ~ 1, data = reading_att[reading_att$asian == 1,], weights = W4CS4P_20)
+reading_3rd_spring_a <-  lm(reading_3rd_spring ~ 1, data = reading_att[reading_att$asian == 1,], weights = W7C7P_20)
+reading_5th_spring_a <- lm(reading_5th_spring ~ 1, data = reading_att[reading_att$asian == 1,], weights = W9C9P_20)
+
+reading_kg_spring_f <-  lm(reading_kg_spring ~ 1, data = reading_att, weights = W1C0)
+reading_1st_spring_f <- lm(reading_1st_spring ~ 1, data = reading_att, weights = W4CS4P_20)
+reading_3rd_spring_f <-  lm(reading_3rd_spring ~ 1, data = reading_att, weights = W7C7P_20)
+reading_5th_spring_f <- lm(reading_5th_spring ~ 1, data = reading_att, weights = W9C9P_20)
+
+stargazer(reading_kg_spring_w, reading_1st_spring_w, reading_3rd_spring_w, reading_5th_spring_w, white_r, female_white_r)
+stargazer(reading_kg_spring_b, reading_1st_spring_b, reading_3rd_spring_b, reading_5th_spring_b, black_r, female_black_r)
+stargazer(reading_kg_spring_h, reading_1st_spring_h, reading_3rd_spring_h, reading_5th_spring_h, hispanic_r, female_hispanic_r)
+stargazer(reading_kg_spring_a, reading_1st_spring_a, reading_3rd_spring_a, reading_5th_spring_a, asian_r, female_asian_r)
+
+```
+
+```{r}
+##science
+
+science_kg_spring_w <-  lm(science_kg_spring ~ 1, data = science_att[science_att$white == 1,], weights = W1C0)
+science_1st_spring_w <-  lm(science_1st_spring ~ 1, data = science_att[science_att$white == 1,], weights = W4CS4P_20)
+science_3rd_spring_w <-  lm(science_3rd_spring ~ 1, data = science_att[science_att$white == 1,], weights = W7C7P_20)
+science_5th_spring_w <- lm(science_5th_spring ~ 1, data = science_att[science_att$white == 1,], weights = W9C9P_20)
+    
+science_kg_spring_b <-  lm(science_kg_spring ~ 1, data = science_att[science_att$black == 1,], weights = W1C0)
+science_1st_spring_b <-  lm(science_1st_spring ~ 1, data = science_att[science_att$black == 1,], weights = W4CS4P_20)
+science_3rd_spring_b <-  lm(science_3rd_spring ~ 1, data = science_att[science_att$black == 1,], weights = W7C7P_20)
+science_5th_spring_b <- lm(science_5th_spring ~ 1, data = science_att[science_att$black == 1,], weights = W9C9P_20)
+
+science_kg_spring_h <-  lm(science_kg_spring ~ 1, data = science_att[science_att$hispanic == 1,], weights = W1C0)
+science_1st_spring_h <-  lm(science_1st_spring ~ 1, data = science_att[science_att$hispanic == 1,], weights = W4CS4P_20)
+science_3rd_spring_h <-  lm(science_3rd_spring ~ 1, data = science_att[science_att$hispanic == 1,], weights = W7C7P_20)
+science_5th_spring_h <- lm(science_5th_spring ~ 1, data = science_att[science_att$hispanic == 1,], weights = W9C9P_20)
+
+science_kg_spring_a <-  lm(science_kg_spring ~ 1, data = science_att[science_att$asian == 1,], weights = W1C0)
+science_1st_spring_a <-  lm(science_1st_spring ~ 1, data = science_att[science_att$asian == 1,], weights = W4CS4P_20)
+science_3rd_spring_a <-  lm(science_3rd_spring ~ 1, data = science_att[science_att$asian == 1,], weights = W7C7P_20)
+science_5th_spring_a <- lm(science_5th_spring ~ 1, data = science_att[science_att$asian == 1,], weights = W9C9P_20)
+
+science_kg_spring_f <-  lm(science_kg_spring ~ 1, data = science_att, weights = W1C0)
+science_1st_spring_f <- lm(science_1st_spring ~ 1, data = science_att, weights = W4CS4P_20)
+science_3rd_spring_f <-  lm(science_3rd_spring ~ 1, data = science_att, weights = W7C7P_20)
+science_5th_spring_f <- lm(science_5th_spring ~ 1, data = science_att, weights = W9C9P_20)
+
+
+stargazer(science_kg_spring_w, science_1st_spring_w, science_3rd_spring_w, science_5th_spring_w, white_s, female_white_s)
+stargazer(science_kg_spring_b, science_1st_spring_b, science_3rd_spring_b, science_5th_spring_b, black_s, female_black_s)
+stargazer(science_kg_spring_h, science_1st_spring_h, science_3rd_spring_h, science_5th_spring_h, hispanic_s, female_hispanic_s)
+stargazer(science_kg_spring_a, science_1st_spring_a, science_3rd_spring_a, science_5th_spring_a, asian_s, female_asian_s)
+```
+
+
+# 3. Raw facts about white-black test score gap in readingematics, Reading and Science using the ECLS-K11 data.
+
+
+```{r, results="asis"}
+
+
+# create a vector of the controls 
+
+vector_controls_X2 <- c("black", "hispanic","asian" , "other" , "X2KAGE_R" , "BIRTH_WEIGHT" , "female" , "P1CHLDBK" , "booksqr" , "MOMOVER30" , "X12SESL" , "WIC" , "MOMTEEN" )
+vector_controls_X4 <- c("black" , "hispanic", "asian" , "other" , "X4AGE" , "BIRTH_WEIGHT" , "female" , "P1CHLDBK" , "booksqr" , "MOMOVER30", "X12SESL" , "WIC" , "MOMTEEN" )
+vector_controls_X7 <- c("black" , "hispanic", "asian" , "other" , "X7AGE" , "BIRTH_WEIGHT" , "female" , "P1CHLDBK" , "booksqr" , "MOMOVER30", "X12SESL" , "WIC" , "MOMTEEN" )
+vector_controls_X9 <- c("black" , "hispanic", "asian" , "other" , "X9AGE" , "BIRTH_WEIGHT" , "female" , "P1CHLDBK" , "booksqr" , "MOMOVER30", "X12SESL" , "WIC" , "MOMTEEN" )
+
+
+#### reading regression table
+
+math_kg_spring_1 <-  lm(math_kg_spring ~ black + hispanic + asian + other, data= math_att, weights = W1C0)
+math_1st_spring_2 <-  lm(math_1st_spring ~ black + hispanic + asian + other, data= math_att, weights = W4CS4P_20)
+math_3rd_spring_3 <- lm(math_3rd_spring ~ black + hispanic + asian + other, data= math_att, weights = W7C7P_20)
+math_5th_spring_4 <- lm(math_5th_spring ~ black + hispanic + asian + other, data= math_att, weights = W9C9P_20)
+
+math_kg_spring_5 <- lm(reformulate(vector_controls_X2, "math_kg_spring"), math_att, weights = W1C0)
+math_1st_spring_6 <- lm(reformulate(vector_controls_X4, "math_1st_spring"), math_att, weights = W4CS4P_20)
+math_3rd_spring_7 <- lm(reformulate(vector_controls_X7, "math_3rd_spring"), math_att, weights = W7C7P_20)
+math_5th_spring_8 <- lm(reformulate(vector_controls_X9, "math_5th_spring"), math_att, weights = W9C9P_20)
+
+
+stargazer(math_kg_spring_1, math_kg_spring_5,math_1st_spring_2, math_1st_spring_6, math_3rd_spring_3, math_3rd_spring_7  , math_5th_spring_4 , math_5th_spring_8 , 
+          title = "Math score by ethnicity with and without controls ",
+          dep.var.labels = c("Math","Math","Math","Math","Math","Math","Math","Math"),
+          column.labels= c("spring kg", "spring 1st", "spring 3rd", "spring 5th","spring kg", "spring 1st", "spring 3rd", "spring 5th"),
+          header = F , 
+          keep.stat = c("n", "rsq"),
+          no.space = T , column.sep.width = "0.5pt" ,font.size = "small" , float.env = "sidewaystable")
+
+
+#### reading regression table 
+
+reading_kg_spring_1 <-  lm(reading_kg_spring ~ black + hispanic + asian + other, data= reading_att, weights = W1C0)
+reading_1st_spring_2 <-  lm(reading_1st_spring ~ black + hispanic + asian + other, data= reading_att, weights = W4CS4P_20)
+reading_3rd_spring_3 <- lm(reading_3rd_spring ~ black + hispanic + asian + other, data= reading_att, weights = W7C7P_20)
+reading_5th_spring_4 <- lm(reading_5th_spring ~ black + hispanic + asian + other, data= reading_att, weights = W9C9P_20)
+
+reading_kg_spring_5 <- lm(reformulate(vector_controls_X2, "reading_kg_spring"), reading_att, weights = W1C0)
+reading_1st_spring_6 <- lm(reformulate(vector_controls_X4, "reading_1st_spring"), reading_att, weights = W4CS4P_20)
+reading_3rd_spring_7 <- lm(reformulate(vector_controls_X7, "reading_3rd_spring"), reading_att, weights = W7C7P_20)
+reading_5th_spring_8 <- lm(reformulate(vector_controls_X9, "reading_5th_spring"), reading_att, weights = W9C9P_20)
+
+
+stargazer(reading_kg_spring_1, reading_kg_spring_5, reading_1st_spring_2, reading_1st_spring_6, reading_3rd_spring_3 ,reading_3rd_spring_7 , reading_5th_spring_4 ,reading_5th_spring_8 , 
+          dep.var.labels = c("Reading","Reading","Reading","Reading","Reading","Reading","Reading","Reading"),
+          title = "Reading score by ethnicity with and without controls ",
+          column.labels= c('spring kg', "spring 1st", "spring 3rd", "spring 5th", 'spring kg', "spring 1st", "spring 3rd", "spring 5th"),
+          header = F , keep.stat = c("n", "rsq"), no.space = T , column.sep.width = "0.5pt" ,font.size = "small" , float.env = "sidewaystable")
+
+
+#### science regression table
+
+science_kg_spring_1 <-  lm(science_kg_spring ~ black + hispanic + asian + other, data= science_att, weights = W1C0)
+science_1st_spring_2 <-  lm(science_1st_spring ~ black + hispanic + asian + other, data= science_att, weights = W4CS4P_20)
+science_3rd_spring_3 <- lm(science_3rd_spring ~ black + hispanic + asian + other, data= science_att, weights = W7C7P_20)
+science_5th_spring_4 <- lm(science_5th_spring ~ black + hispanic + asian + other, data= science_att, weights = W9C9P_20)
+
+science_kg_spring_5 <- lm(reformulate(vector_controls_X2, "science_kg_spring"), science_att, weights = W1C0)
+science_1st_spring_6 <- lm(reformulate(vector_controls_X4, "science_1st_spring"), science_att, weights = W4CS4P_20)
+science_3rd_spring_7 <- lm(reformulate(vector_controls_X7, "science_3rd_spring"), science_att, weights = W7C7P_20)
+science_5th_spring_8 <- lm(reformulate(vector_controls_X9, "science_5th_spring"), science_att, weights = W9C9P_20)
+
+stargazer(science_kg_spring_1, science_kg_spring_5, science_1st_spring_2, science_1st_spring_6, science_3rd_spring_3 , science_3rd_spring_7 , science_5th_spring_4, science_5th_spring_8 , 
+          dep.var.labels = c("Science","Science","Science","Science","Science","Science"), 
+          column.labels= c('spring kg', "spring 1st", "spring 3rd", "spring 5th",'spring kg', "spring 1st",  "spring 3rd", "spring 5th"),
+          title = "Science score by ethnicity with and without controls ",
+          header = F , keep.stat = c("n", "rsq"), no.space = T , 
+          column.sep.width = "0.5pt" ,font.size = "small" , float.env = "sidewaystable")
+
+graph <- data.frame("Grade" = c("spring kg", "spring 1st", "spring 3rd", "spring 5th"),
+                    "Subject" = c("Math","Math","Math","Math","Math","Math","Math","Math",
+                                  "Reading","Reading","Reading","Reading","Reading","Reading","Reading","Reading",
+                                  "Science","Science","Science","Science","Science","Science","Science","Science"),
+                           "Type" = c("Base", "Base", "Base", "Base", "Control","Control","Control","Control"),
+                          "Estimate" = c(summary(math_kg_spring_1)$coefficient[2,1],
+                                              summary(math_1st_spring_2)$coefficient[2,1],
+                                              summary(math_3rd_spring_3)$coefficient[2,1],
+                                              summary(math_5th_spring_4)$coefficient[2,1],
+                                         summary(math_kg_spring_5)$coefficient[2,1],
+                                                  summary(math_1st_spring_6)$coefficient[2,1],
+                                                  summary(math_3rd_spring_7)$coefficient[2,1],
+                                                  summary(math_5th_spring_8)$coefficient[2,1],
+                                         summary(reading_kg_spring_1)$coefficient[2,1],
+                                              summary(reading_1st_spring_2)$coefficient[2,1],
+                                              summary(reading_3rd_spring_3)$coefficient[2,1],
+                                              summary(reading_5th_spring_4)$coefficient[2,1],
+                                         summary(reading_kg_spring_5)$coefficient[2,1],
+                                                  summary(reading_1st_spring_6)$coefficient[2,1],
+                                                  summary(reading_3rd_spring_7)$coefficient[2,1],
+                                                  summary(reading_5th_spring_8)$coefficient[2,1],
+                                         summary(science_kg_spring_1)$coefficient[2,1],
+                                              summary(science_1st_spring_2)$coefficient[2,1],
+                                              summary(science_3rd_spring_3)$coefficient[2,1],
+                                              summary(science_5th_spring_4)$coefficient[2,1],
+                                         summary(science_kg_spring_5)$coefficient[2,1],
+                                                  summary(science_1st_spring_6)$coefficient[2,1],
+                                                  summary(science_3rd_spring_7)$coefficient[2,1],
+                                                  summary(science_5th_spring_8)$coefficient[2,1]
+                                              ),
+                          "SE" = c(summary(math_kg_spring_1)$coefficient[2,2],
+                                        summary(math_1st_spring_2)$coefficient[2,2],
+                                        summary(math_3rd_spring_3)$coefficient[2,2],
+                                        summary(math_5th_spring_4)$coefficient[2,2],
+                                        summary(math_kg_spring_5)$coefficient[2,2],
+                                            summary(math_1st_spring_6)$coefficient[2,2],
+                                            summary(math_3rd_spring_7)$coefficient[2,2],
+                                            summary(math_5th_spring_8)$coefficient[2,2],
+                    summary(reading_kg_spring_1)$coefficient[2,2],
+                                        summary(reading_1st_spring_2)$coefficient[2,2],
+                                        summary(reading_3rd_spring_3)$coefficient[2,2],
+                                        summary(reading_5th_spring_4)$coefficient[2,2],
+                                        summary(reading_kg_spring_5)$coefficient[2,2],
+                                            summary(reading_1st_spring_6)$coefficient[2,2],
+                                            summary(reading_3rd_spring_7)$coefficient[2,2],
+                                            summary(reading_5th_spring_8)$coefficient[2,2],
+                    summary(science_kg_spring_1)$coefficient[2,2],
+                                        summary(science_1st_spring_2)$coefficient[2,2],
+                                        summary(science_3rd_spring_3)$coefficient[2,2],
+                                        summary(science_5th_spring_4)$coefficient[2,2],
+                                        summary(science_kg_spring_5)$coefficient[2,2],
+                                            summary(science_1st_spring_6)$coefficient[2,2],
+                                            summary(science_3rd_spring_7)$coefficient[2,2],
+                                            summary(science_5th_spring_8)$coefficient[2,2]), check.rows = FALSE , check.names = FALSE
+                                          )
+
+
+```
+
+# 4. Are black losing ground because of schools quality?
+
+# SCHOOL FIXED EFFECTS 
+
+```{r, include=F}
+# SCHOOL FIXED EFFECTS 
+
+library(lfe)
+library(plm)
+
+## mathematics 
+ S2_ID <- math_att %>% 
+  mutate(n = 1) %>% 
+  group_by(S2_ID) %>% 
+  summarise(WHITE = sum(white, na.rm=T),
+            BLACK = sum(black, na.rm=T),
+            HISPANIC = sum(hispanic, na.rm=T),
+            ASIAN = sum(asian, na.rm=T),
+            OTHER = sum(other, na.rm=T),
+            N = sum(n, na.rm = T)) %>% 
+  mutate(all_white = ifelse(WHITE == N, 1, 0)) %>% 
+  ungroup() %>% 
+  merge(math_att) %>% 
+  filter(!all_white == 1)
+ 
+neverchange<- math_att %>% 
+  mutate(n = 1) %>% 
+  group_by(S2_ID) %>% 
+  summarise(WHITE = sum(white, na.rm=T),
+            BLACK = sum(black, na.rm=T),
+            HISPANIC = sum(hispanic, na.rm=T),
+            ASIAN = sum(asian, na.rm=T),
+            OTHER = sum(other, na.rm=T),
+            N = sum(n, na.rm = T)) %>% 
+  mutate(all_white = ifelse(WHITE == N, 1, 0)) %>% 
+  ungroup() %>% 
+  merge(math_att) %>% 
+  filter(!all_white == 1) %>% 
+  filter(change_school== 0)
+  
+prova(math_att, S2_ID, y)
+
+
+
+#table(df_clean$S2BLACP2)
+
+#S4BLACP2, S6BLACP2,
+
+# Race of teachers
+#unique(df_clean$S6MULTP2)
+#S4MULTP2, 
+
+#table(df_clean$S2MULTP2)
+#table(df_clean$S4MULTP2)
+
+
+# In R, vcovHC automatically reports clustered standard errors after “running” plm.
+
+
+
+
+
+
+# school ID
+#    S2_ID    spring kg 2011
+#    S4_ID      spring 1st 2012
+# S7_ID,     spring 3rd 2014
+# S9_ID,    spring 5th 2016
+
+
+    
+    
+   
+# # percent non white students at school
+# X2KRCETH, X4RCETH, X6RCETH, X7RCETH_R, X8RCETH, X9RCETH,
+# 
+# unique(df_clean$X2KRCETH)
+# # total school enrolment 
+# X2KENRLS, X4ENRLS, X6ENRLS, X7ENRLS_R, X8ENRLS, X9ENRLS,
+# 
+# # school type: catholic, public, other private, other religious
+# X1KSCTYP, X2KSCTYP, X4SCTYP, X6SCTYP, X7SCTYP, X8SCTYP, X9SCTYP,
+# 
+# unique(df_clean$X1KSCTYP)
+# table(df_clean$X1KSCTYP)
+```
+
+
+
+
+
+
+
+
+```{r}
+## new
+
+math_lm_X2 <- lm(math_kg_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , data= S2_ID)
+
+
+math_fe_X2 <- plm(math_kg_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID,
+    index = c("S2_ID"),
+    model = "within")
+math_fe_X2 <- coeftest(math_fe_X2, vcovHC(math_fe_X2, type = 'HC0', cluster = 'group'))
+
+
+math_lm_X4 <- lm(math_1st_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , data= S2_ID)
+
+math_fe_X4 <- plm(math_1st_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID , 
+    index = c("S4_ID"),
+    model = "within")
+math_fe_X4 <- coeftest(math_fe_X4, vcovHC(math_fe_X4, type = 'HC0', cluster = 'group'))
+math_fe_X4 
+
+math_lm_X7 <- lm(math_3rd_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, data= S2_ID )
+
+
+math_fe_X7 <- plm(math_3rd_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID, 
+    index = c("S7_ID"),
+    model = "within")
+math_fe_X7 <- coeftest(math_fe_X7, vcovHC(math_fe_X7, type = 'HC0', cluster = 'group'))
+
+math_lm_X9 <- lm(math_5th_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , data= S2_ID, weights = W9C9P_20)
+
+math_fe_X9 <- plm(math_5th_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X9 , 
+    data= S2_ID, 
+    index = c("S9_ID"),
+    model = "within")
+
+math_fe_X9 <- coeftest(math_fe_X9, vcovHC(math_fe_X9, type = 'HC0', cluster = 'group'))
+
+math_lm_diff_1st_kg<- lm(math_diff_1st_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN+ single_parent_X2 ,  data= S2_ID )
+
+
+math_lm_diff_3rd_1st<- lm(math_diff_3rd_1st ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , data= S2_ID ) 
+
+math_lm_diff_5th_3rd<-lm(math_diff_5th_3rd ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, data= S2_ID ) 
+
+math_lm_diff_5th_kg<-lm(math_diff_5th_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, data= S2_ID ) 
+
+math_lm_diff_3rd_kg<- lm(math_diff_3rd_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , data= S2_ID )
+
+
+math_fe_diff_3rd_kg <- plm(math_diff_3rd_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID, 
+    index = c("S7_ID"),
+    model = "within")
+
+math_fe_diff_5th_kg <- plm(math_diff_5th_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID, 
+    index = c("S9_ID"),
+    model = "within")
+math_fe_diff_3rd_kg <- coeftest(math_fe_diff_3rd_kg, vcovHC(math_fe_diff_3rd_kg, type = 'HC0', cluster = 'group'))
+math_fe_diff_5th_kg <- coeftest(math_fe_diff_5th_kg, vcovHC(math_fe_diff_5th_kg, type = 'HC0', cluster = 'group'))
+
+stargazer(math_lm_diff_3rd_kg, math_lm_diff_5th_kg)
+stargazer(math_fe_diff_3rd_kg, math_fe_diff_5th_kg)
+
+math_fe_diff_1st_kg <- plm(math_diff_1st_kg~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , 
+    data= S2_ID, 
+    index = c("S2_ID"),
+    model = "within")
+
+
+math_fe_diff_3rd_1st <- plm(math_diff_3rd_1st ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID, 
+    index = c("S4_ID"),
+    model = "within")
+
+math_fe_diff_5th_3rd <- plm(math_diff_5th_3rd~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID, 
+    index = c("S7_ID"),
+    model = "within")
+math_fe_diff_1st_kg <- coeftest(math_fe_diff_1st_kg, vcovHC(math_fe_diff_1st_kg, type = 'HC0', cluster = 'group'))
+math_fe_diff_3rd_1st <- coeftest(math_fe_diff_3rd_1st, vcovHC(math_fe_diff_3rd_1st, type = 'HC0', cluster = 'group'))
+math_fe_diff_5th_3rd <- coeftest(math_fe_diff_5th_3rd, vcovHC(math_fe_diff_5th_3rd, type = 'HC0', cluster = 'group'))
+
+stargazer(math_lm_X2,math_lm_X4, math_lm_X7, math_lm_X9, math_lm_diff_1st_kg,math_lm_diff_3rd_1st,math_lm_diff_5th_3rd)
+stargazer(math_fe_X2, math_fe_X4,math_fe_X7, math_fe_X9, math_fe_diff_1st_kg,math_fe_diff_3rd_1st, math_fe_diff_5th_3rd)  
+
+
+## READING
+
+reading_lm_X2 <- lm(reading_kg_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 ,  data= S2_ID)
+
+
+reading_fe_X2 <- plm(reading_kg_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID,
+    index = c("S2_ID"),
+    model = "within")
+
+
+reading_lm_X4 <-lm(reading_1st_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2,  data= S2_ID)
+
+reading_fe_X4 <- plm(reading_1st_spring ~ black + hispanic + asian + other +X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID , 
+    index = c("S4_ID"),
+    model = "within")
+
+
+reading_lm_X7 <- lm(reading_3rd_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , data= S2_ID )
+
+
+reading_fe_X7 <-plm(reading_3rd_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , 
+    data= S2_ID, 
+    index = c("S7_ID"),
+    model = "within")
+
+
+
+reading_lm_X9 <- lm(reading_5th_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, data= S2_ID)
+
+reading_fe_X9 <-plm(reading_5th_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID, 
+    index = c("S9_ID"),
+    model = "within")
+
+reading_lm_diff_1st_kg<-lm(reading_diff_1st_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN+ single_parent_X2  , data= S2_ID )
+
+
+reading_lm_diff_3rd_1st<-lm(reading_diff_3rd_1st ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 ,  weights = W4CS4P_20, data= S2_ID )
+
+reading_lm_diff_5th_3rd<-lm(reading_diff_5th_3rd ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, data= S2_ID )
+
+reading_lm_diff_3rd_kg<-lm(reading_diff_3rd_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 ,  weights = W4CS4P_20, data= S2_ID )
+
+reading_lm_diff_5th_kg<-lm(reading_diff_5th_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, data= S2_ID )
+
+stargazer(reading_lm_diff_3rd_kg, reading_lm_diff_5th_kg)
+
+reading_fe_diff_1st_kg <- plm(reading_diff_1st_kg~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID, 
+    index = c("S2_ID"),
+    model = "within")
+
+reading_fe_diff_3rd_1st <- plm(reading_diff_3rd_1st ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID, 
+    index = c("S4_ID"),
+    model = "within")
+
+reading_fe_diff_5th_3rd <- plm(reading_diff_5th_3rd~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID, 
+    index = c("S7_ID"),
+    model = "within")
+
+reading_fe_diff_3rd_kg <- plm(reading_diff_3rd_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID, 
+    index = c("S7_ID"),
+    model = "within")
+
+reading_fe_diff_5th_kg <- plm(reading_diff_5th_kg~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID, 
+    index = c("S9_ID"),
+    model = "within")
+
+reading_fe_X2 <- coeftest(reading_fe_X2, vcovHC(reading_fe_X2, type = 'HC0', cluster = 'group'))
+reading_fe_X4 <- coeftest(reading_fe_X4, vcovHC(reading_fe_X4, type = 'HC0', cluster = 'group'))
+reading_fe_X7 <- coeftest(reading_fe_X7, vcovHC(reading_fe_X7, type = 'HC0', cluster = 'group'))
+reading_fe_X9 <- coeftest(reading_fe_X9, vcovHC(reading_fe_X9, type = 'HC0', cluster = 'group'))
+
+reading_fe_diff_1st_kg <- coeftest(reading_fe_diff_1st_kg, vcovHC(reading_fe_diff_1st_kg, type = 'HC0', cluster = 'group'))
+reading_fe_diff_3rd_1st <- coeftest(reading_fe_diff_3rd_1st, vcovHC(reading_fe_diff_3rd_1st, type = 'HC0', cluster = 'group'))
+reading_fe_diff_5th_3rd <- coeftest(reading_fe_diff_5th_3rd, vcovHC(reading_fe_diff_5th_3rd, type = 'HC0', cluster = 'group'))
+
+reading_fe_diff_3rd_kg <- coeftest(reading_fe_diff_3rd_kg, vcovHC(reading_fe_diff_3rd_kg, type = 'HC0', cluster = 'group'))
+reading_fe_diff_5th_kg <- coeftest(reading_fe_diff_5th_kg, vcovHC(reading_fe_diff_5th_kg, type = 'HC0', cluster = 'group'))
+
+stargazer(reading_fe_diff_3rd_kg, reading_fe_diff_5th_kg)
+
+science_lm_X2 <- lm(science_kg_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , data= S2_ID)
+
+
+science_fe_X2 <- plm(science_kg_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , 
+    data= S2_ID,
+    index = c("S2_ID"),
+    model = "within")
+
+
+science_lm_X4 <- lm(science_1st_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, data= S2_ID)
+
+science_fe_X4 <- plm(science_1st_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , 
+    data= S2_ID , 
+    index = c("S4_ID"),
+    model = "within")
+
+
+science_lm_X7 <- lm(science_3rd_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 ,  data= S2_ID )
+
+
+science_fe_X7 <- plm(science_3rd_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , 
+    data= S2_ID, 
+    index = c("S7_ID"),
+    model = "within")
+
+
+
+science_lm_X9 <- lm(science_5th_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, data= S2_ID, weights = W9C9P_20)
+
+science_fe_X9 <- plm(science_5th_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X9 , 
+    data= S2_ID, 
+    index = c("S9_ID"),
+    model = "within")
+
+science_lm_diff_1st_kg<-lm(science_diff_1st_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN+ single_parent_X2 , data= S2_ID )
+
+
+science_lm_diff_3rd_1st<-lm(science_diff_3rd_1st ~ black + hispanic + asian + other + X1KAGE_R+ BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2,   data= S2_ID )
+
+science_lm_diff_5th_3rd<-lm(science_diff_5th_3rd ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2,  data= S2_ID )
+
+science_lm_diff_3rd_kg<-lm(science_diff_3rd_kg ~ black + hispanic + asian + other + X1KAGE_R+ BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2,   data= S2_ID )
+
+science_lm_diff_5th_kg<-lm(science_diff_5th_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2,  data= S2_ID )
+stargazer(science_lm_diff_3rd_kg, science_lm_diff_5th_kg)
+
+science_fe_diff_1st_kg <- plm(science_diff_1st_kg~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID, 
+    index = c("S2_ID"),
+    model = "within")
+
+science_fe_diff_3rd_1st <- plm(science_diff_3rd_1st ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID, 
+    index = c("S4_ID"),
+    model = "within")
+
+science_fe_diff_5th_3rd <- plm(science_diff_5th_3rd~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID, 
+    index = c("S7_ID"),
+    model = "within")
+science_fe_diff_3rd_kg <- plm(science_diff_3rd_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID, 
+    index = c("S7_ID"),
+    model = "within")
+
+science_fe_diff_5th_kg <- plm(science_diff_5th_kg~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID, 
+    index = c("S9_ID"),
+    model = "within")
+science_fe_X2 <- coeftest(science_fe_X2, vcovHC(science_fe_X2, type = 'HC0', cluster = 'group'))
+science_fe_X4 <- coeftest(science_fe_X4, vcovHC(science_fe_X4, type = 'HC0', cluster = 'group'))
+science_fe_X7 <- coeftest(science_fe_X7, vcovHC(science_fe_X7, type = 'HC0', cluster = 'group'))
+science_fe_X9 <- coeftest(science_fe_X9, vcovHC(science_fe_X9, type = 'HC0', cluster = 'group'))
+
+science_fe_diff_1st_kg <- coeftest(science_fe_diff_1st_kg, vcovHC(science_fe_diff_1st_kg, type = 'HC0', cluster = 'group'))
+science_fe_diff_3rd_1st <- coeftest(science_fe_diff_3rd_1st, vcovHC(science_fe_diff_3rd_1st, type = 'HC0', cluster = 'group'))
+science_fe_diff_5th_3rd <- coeftest(science_fe_diff_5th_3rd, vcovHC(science_fe_diff_5th_3rd, type = 'HC0', cluster = 'group'))
+
+science_fe_diff_3rd_kg <- coeftest(science_fe_diff_3rd_kg, vcovHC(science_fe_diff_3rd_kg, type = 'HC0', cluster = 'group'))
+science_fe_diff_5th_kg <- coeftest(science_fe_diff_5th_kg, vcovHC(science_fe_diff_5th_kg, type = 'HC0', cluster = 'group'))
+
+stargazer(science_fe_diff_3rd_kg, science_fe_diff_5th_kg )
+
+stargazer(reading_lm_X2,reading_lm_X4, reading_lm_X7, reading_lm_X9, reading_lm_diff_1st_kg,reading_lm_diff_3rd_1st,reading_lm_diff_5th_3rd)
+stargazer(reading_fe_X2, reading_fe_X4,reading_fe_X7, reading_fe_X9, reading_fe_diff_1st_kg,reading_fe_diff_3rd_1st, reading_fe_diff_5th_3rd) 
+
+stargazer(science_lm_X2,science_lm_X4, science_lm_X7, science_lm_X9, science_lm_diff_1st_kg,science_lm_diff_3rd_1st,science_lm_diff_5th_3rd)
+stargazer(science_fe_X2, science_fe_X4,science_fe_X7, science_fe_X9, science_fe_diff_1st_kg,science_fe_diff_3rd_1st, science_fe_diff_5th_3rd) 
+
+
+
+
+
+
+## new2
+
+math_lm_X2 <- lm(math_kg_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , data= S2_ID)
+
+
+math_fe_X2 <- plm(math_kg_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID,
+    index = c("S2_ID"),
+    model = "within")
+math_fe_X2 <- coeftest(math_fe_X2, vcovHC(math_fe_X2, type = 'HC0', cluster = 'group'))
+
+
+math_lm_X4 <- lm(math_1st_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , data= S2_ID)
+
+math_fe_X4 <- plm(math_1st_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID , 
+    index = c("S2_ID"),
+    model = "within")
+math_fe_X4 <- coeftest(math_fe_X4, vcovHC(math_fe_X4, type = 'HC0', cluster = 'group'))
+math_fe_X4 
+
+math_lm_X7 <- lm(math_3rd_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, data= S2_ID )
+
+
+math_fe_X7 <- plm(math_3rd_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID, 
+    index = c("S2_ID"),
+    model = "within")
+math_fe_X7 <- coeftest(math_fe_X7, vcovHC(math_fe_X7, type = 'HC0', cluster = 'group'))
+
+math_lm_X9 <- lm(math_5th_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , data= S2_ID, weights = W9C9P_20)
+
+math_fe_X9 <- plm(math_5th_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X9 , 
+    data= S2_ID, 
+    index = c("S2_ID"),
+    model = "within")
+
+math_fe_X9 <- coeftest(math_fe_X9, vcovHC(math_fe_X9, type = 'HC0', cluster = 'group'))
+
+math_lm_diff_1st_kg<- lm(math_diff_1st_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN+ single_parent_X2 ,  data= S2_ID )
+
+
+math_lm_diff_3rd_1st<- lm(math_diff_3rd_1st ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , data= S2_ID ) 
+
+math_lm_diff_5th_3rd<-lm(math_diff_5th_3rd ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, data= S2_ID ) 
+
+math_lm_diff_3rd_kg<- lm(math_diff_3rd_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , data= S2_ID ) 
+
+math_lm_diff_5th_kg<-lm(math_diff_5th_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, data= S2_ID )
+ 
+stargazer(math_lm_diff_3rd_kg, math_lm_diff_5th_kg)
+
+math_fe_diff_1st_kg <- plm(math_diff_1st_kg~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , 
+    data= S2_ID, 
+    index = c("S2_ID"),
+    model = "within")
+
+
+math_fe_diff_3rd_kg <- plm(math_diff_3rd_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID, 
+    index = c("S2_ID"),
+    model = "within")
+
+math_fe_diff_5th_kg <- plm(math_diff_5th_kg~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID, 
+    index = c("S2_ID"),
+    model = "within")
+
+math_fe_diff_1st_kg <- coeftest(math_fe_diff_1st_kg, vcovHC(math_fe_diff_1st_kg, type = 'HC0', cluster = 'group'))
+math_fe_diff_3rd_kg <- coeftest(math_fe_diff_3rd_kg, vcovHC(math_fe_diff_3rd_kg, type = 'HC0', cluster = 'group'))
+math_fe_diff_5th_kg <- coeftest(math_fe_diff_5th_kg, vcovHC(math_fe_diff_5th_kg, type = 'HC0', cluster = 'group'))
+
+stargazer(math_fe_diff_3rd_kg, math_fe_diff_5th_kg)
+stargazer(math_lm_X2,math_lm_X4, math_lm_X7, math_lm_X9, math_lm_diff_1st_kg,math_lm_diff_3rd_1st,math_lm_diff_5th_3rd)
+stargazer(math_fe_X2, math_fe_X4,math_fe_X7, math_fe_X9, math_fe_diff_1st_kg,math_fe_diff_3rd_1st, math_fe_diff_5th_3rd)  
+
+
+## READING
+
+reading_lm_X2 <- lm(reading_kg_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 ,  data= S2_ID)
+
+
+reading_fe_X2 <- plm(reading_kg_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID,
+    index = c("S2_ID"),
+    model = "within")
+
+
+reading_lm_X4 <-lm(reading_1st_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2,  data= S2_ID)
+
+reading_fe_X4 <- plm(reading_1st_spring ~ black + hispanic + asian + other +X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID , 
+    index = c("S2_ID"),
+    model = "within")
+
+
+reading_lm_X7 <- lm(reading_3rd_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , data= S2_ID )
+
+
+reading_fe_X7 <-plm(reading_3rd_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , 
+    data= S2_ID, 
+    index = c("S2_ID"),
+    model = "within")
+
+
+
+reading_lm_X9 <- lm(reading_5th_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, data= S2_ID)
+
+reading_fe_X9 <-plm(reading_5th_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID, 
+    index = c("S2_ID"),
+    model = "within")
+
+reading_lm_diff_1st_kg<-lm(reading_diff_1st_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN+ single_parent_X2  , data= S2_ID )
+
+
+reading_lm_diff_3rd_kg<-lm(reading_diff_3rd_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 ,  weights = W4CS4P_20, data= S2_ID )
+
+reading_lm_diff_5th_kg<-lm(reading_diff_5th_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, data= S2_ID )
+
+stargazer(reading_lm_diff_3rd_kg, reading_lm_diff_5th_kg)
+
+reading_fe_diff_1st_kg <- plm(reading_diff_1st_kg~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID, 
+    index = c("S2_ID"),
+    model = "within")
+
+reading_fe_diff_3rd_kg <- plm(reading_diff_3rd_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID, 
+    index = c("S2_ID"),
+    model = "within")
+
+reading_fe_diff_5th_kg <- plm(reading_diff_5th_kg~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID, 
+    index = c("S2_ID"),
+    model = "within")
+
+
+reading_fe_X2 <- coeftest(reading_fe_X2, vcovHC(reading_fe_X2, type = 'HC0', cluster = 'group'))
+reading_fe_X4 <- coeftest(reading_fe_X4, vcovHC(reading_fe_X4, type = 'HC0', cluster = 'group'))
+reading_fe_X7 <- coeftest(reading_fe_X7, vcovHC(reading_fe_X7, type = 'HC0', cluster = 'group'))
+reading_fe_X9 <- coeftest(reading_fe_X9, vcovHC(reading_fe_X9, type = 'HC0', cluster = 'group'))
+
+reading_fe_diff_1st_kg <- coeftest(reading_fe_diff_1st_kg, vcovHC(reading_fe_diff_1st_kg, type = 'HC0', cluster = 'group'))
+reading_fe_diff_3rd_kg <- coeftest(reading_fe_diff_3rd_kg, vcovHC(reading_fe_diff_3rd_kg, type = 'HC0', cluster = 'group'))
+reading_fe_diff_5th_kg <- coeftest(reading_fe_diff_5th_kg, vcovHC(reading_fe_diff_5th_kg, type = 'HC0', cluster = 'group'))
+reading_fe_diff_5th_kg 
+stargazer(reading_fe_diff_3rd_kg,reading_fe_diff_5th_kg)
+
+science_lm_X2 <- lm(science_kg_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , data= S2_ID)
+
+
+science_fe_X2 <- plm(science_kg_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , 
+    data= S2_ID,
+    index = c("S2_ID"),
+    model = "within")
+
+
+science_lm_X4 <- lm(science_1st_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, data= S2_ID)
+
+science_fe_X4 <- plm(science_1st_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , 
+    data= S2_ID , 
+    index = c("S2_ID"),
+    model = "within")
+
+
+science_lm_X7 <- lm(science_3rd_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 ,  data= S2_ID )
+
+
+science_fe_X7 <- plm(science_3rd_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , 
+    data= S2_ID, 
+    index = c("S2_ID"),
+    model = "within")
+
+
+
+science_lm_X9 <- lm(science_5th_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, data= S2_ID, weights = W9C9P_20)
+
+science_fe_X9 <- plm(science_5th_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X9 , 
+    data= S2_ID, 
+    index = c("S2_ID"),
+    model = "within")
+
+science_lm_diff_1st_kg<-lm(science_diff_1st_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN+ single_parent_X2 , data= S2_ID )
+
+
+science_lm_diff_3rd_kg<-lm(science_diff_3rd_kg ~ black + hispanic + asian + other + X1KAGE_R+ BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2,   data= S2_ID )
+
+science_lm_diff_5th_kg<-lm(science_diff_5th_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2,  data= S2_ID )
+
+stargazer(science_lm_diff_3rd_kg,science_lm_diff_5th_kg )
+
+science_fe_diff_1st_kg <- plm(science_diff_1st_kg~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID, 
+    index = c("S2_ID"),
+    model = "within")
+
+science_fe_diff_3rd_kg <- plm(science_diff_3rd_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID, 
+    index = c("S2_ID"),
+    model = "within")
+
+science_fe_diff_5th_kg <- plm(science_diff_5th_kg~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= S2_ID, 
+    index = c("S2_ID"),
+    model = "within")
+
+science_fe_X2 <- coeftest(science_fe_X2, vcovHC(science_fe_X2, type = 'HC0', cluster = 'group'))
+science_fe_X4 <- coeftest(science_fe_X4, vcovHC(science_fe_X4, type = 'HC0', cluster = 'group'))
+science_fe_X7 <- coeftest(science_fe_X7, vcovHC(science_fe_X7, type = 'HC0', cluster = 'group'))
+science_fe_X9 <- coeftest(science_fe_X9, vcovHC(science_fe_X9, type = 'HC0', cluster = 'group'))
+
+science_fe_diff_1st_kg <- coeftest(science_fe_diff_1st_kg, vcovHC(science_fe_diff_1st_kg, type = 'HC0', cluster = 'group'))
+science_fe_diff_3rd_kg <- coeftest(science_fe_diff_3rd_kg, vcovHC(science_fe_diff_3rd_kg, type = 'HC0', cluster = 'group'))
+science_fe_diff_5th_kg <- coeftest(science_fe_diff_5th_kg, vcovHC(science_fe_diff_5th_kg, type = 'HC0', cluster = 'group'))
+
+stargazer(science_fe_diff_3rd_kg, science_fe_diff_5th_kg)
+
+stargazer(reading_lm_X2,reading_lm_X4, reading_lm_X7, reading_lm_X9, reading_lm_diff_1st_kg,reading_lm_diff_3rd_1st,reading_lm_diff_5th_3rd)
+stargazer(reading_fe_X2, reading_fe_X4,reading_fe_X7, reading_fe_X9, reading_fe_diff_1st_kg,reading_fe_diff_3rd_1st, reading_fe_diff_5th_3rd) 
+
+stargazer(science_lm_X2,science_lm_X4, science_lm_X7, science_lm_X9, science_lm_diff_1st_kg,science_lm_diff_3rd_1st,science_lm_diff_5th_3rd)
+stargazer(science_fe_X2, science_fe_X4,science_fe_X7, science_fe_X9, science_fe_diff_1st_kg,science_fe_diff_3rd_1st, science_fe_diff_5th_3rd) 
+
+
+
+
+#NEVER CHANGE
+
+math_lm_X2 <- lm(math_kg_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , data= neverchange)
+
+
+math_fe_X2 <- plm(math_kg_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data=neverchange,
+    index = c("S2_ID"),
+    model = "within")
+math_fe_X2 <- coeftest(math_fe_X2, vcovHC(math_fe_X2, type = 'HC0', cluster = 'group'))
+
+
+math_lm_X4 <- lm(math_1st_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , data= neverchange)
+
+math_fe_X4 <- plm(math_1st_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= neverchange , 
+    index = c("S2_ID"),
+    model = "within")
+math_fe_X4 <- coeftest(math_fe_X4, vcovHC(math_fe_X4, type = 'HC0', cluster = 'group'))
+math_fe_X4 
+
+math_lm_X7 <- lm(math_3rd_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, data= neverchange)
+
+
+math_fe_X7 <- plm(math_3rd_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= neverchange, 
+    index = c("S2_ID"),
+    model = "within")
+math_fe_X7 <- coeftest(math_fe_X7, vcovHC(math_fe_X7, type = 'HC0', cluster = 'group'))
+
+math_lm_X9 <- lm(math_5th_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , data= neverchange, weights = W9C9P_20)
+
+math_fe_X9 <- plm(math_5th_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X9 , 
+    data= neverchange, 
+    index = c("S2_ID"),
+    model = "within")
+
+math_fe_X9 <- coeftest(math_fe_X9, vcovHC(math_fe_X9, type = 'HC0', cluster = 'group'))
+
+math_lm_diff_1st_kg<- lm(math_diff_1st_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN+ single_parent_X2 ,  data= neverchange )
+
+
+math_lm_diff_3rd_kg<- lm(math_diff_3rd_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , data= neverchange) 
+
+math_lm_diff_5th_kg<-lm(math_diff_5th_kg~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, data= neverchange ) 
+star
+stargazer(math_lm_diff_3rd_kg, math_lm_diff_5th_kg)
+
+
+math_fe_diff_1st_kg <- plm(math_diff_1st_kg~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , 
+    data= neverchange, 
+    index = c("S2_ID"),
+    model = "within")
+
+
+math_fe_diff_3rd_kg <- plm(math_diff_3rd_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= neverchange, 
+    index = c("S2_ID"),
+    model = "within")
+
+math_fe_diff_5th_kg <- plm(math_diff_5th_kg~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= neverchange, 
+    index = c("S2_ID"),
+    model = "within")
+math_fe_diff_1st_kg <- coeftest(math_fe_diff_1st_kg, vcovHC(math_fe_diff_1st_kg, type = 'HC0', cluster = 'group'))
+math_fe_diff_3rd_kg <- coeftest(math_fe_diff_3rd_kg, vcovHC(math_fe_diff_3rd_kg, type = 'HC0', cluster = 'group'))
+math_fe_diff_5th_kg <- coeftest(math_fe_diff_5th_kg, vcovHC(math_fe_diff_5th_kg, type = 'HC0', cluster = 'group'))
+
+stargazer(math_lm_X2,math_lm_X4, math_lm_X7, math_lm_X9, math_lm_diff_1st_kg,math_lm_diff_3rd_1st,math_lm_diff_5th_3rd)
+stargazer(math_fe_X2, math_fe_X4,math_fe_X7, math_fe_X9, math_fe_diff_1st_kg,math_fe_diff_3rd_1st, math_fe_diff_5th_3rd)  
+stargazer(math_fe_diff_3rd_kg, math_fe_diff_5th_kg)
+
+## READING
+
+reading_lm_X2 <- lm(reading_kg_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 ,  data= neverchange)
+
+
+reading_fe_X2 <- plm(reading_kg_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= neverchange,
+    index = c("S2_ID"),
+    model = "within")
+
+
+reading_lm_X4 <-lm(reading_1st_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2,  data= neverchange)
+
+reading_fe_X4 <- plm(reading_1st_spring ~ black + hispanic + asian + other +X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= neverchange , 
+    index = c("S2_ID"),
+    model = "within")
+
+
+reading_lm_X7 <- lm(reading_3rd_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , data= neverchange )
+
+
+reading_fe_X7 <-plm(reading_3rd_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , 
+    data= neverchange, 
+    index = c("S2_ID"),
+    model = "within")
+
+
+
+reading_lm_X9 <- lm(reading_5th_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, data= neverchange)
+
+reading_fe_X9 <-plm(reading_5th_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= neverchange, 
+    index = c("S2_ID"),
+    model = "within")
+
+reading_lm_diff_1st_kg<-lm(reading_diff_1st_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN+ single_parent_X2  , data= neverchange )
+
+
+reading_lm_diff_3rd_kg<-lm(reading_diff_3rd_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 ,  weights = W4CS4P_20, data= neverchange )
+
+reading_lm_diff_5th_kg<-lm(reading_diff_5th_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, data= neverchange )
+
+
+stargazer(reading_lm_diff_3rd_kg, reading_lm_diff_5th_kg)
+reading_fe_diff_1st_kg <- plm(reading_diff_1st_kg~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= neverchange, 
+    index = c("S2_ID"),
+    model = "within")
+
+reading_fe_diff_3rd_kg <- plm(reading_diff_3rd_kg~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= neverchange, 
+    index = c("S2_ID"),
+    model = "within")
+
+reading_fe_diff_5th_kg <- plm(reading_diff_5th_kg~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= neverchange, 
+    index = c("S2_ID"),
+    model = "within")
+
+
+reading_fe_X2 <- coeftest(reading_fe_X2, vcovHC(reading_fe_X2, type = 'HC0', cluster = 'group'))
+reading_fe_X4 <- coeftest(reading_fe_X4, vcovHC(reading_fe_X4, type = 'HC0', cluster = 'group'))
+reading_fe_X7 <- coeftest(reading_fe_X7, vcovHC(reading_fe_X7, type = 'HC0', cluster = 'group'))
+reading_fe_X9 <- coeftest(reading_fe_X9, vcovHC(reading_fe_X9, type = 'HC0', cluster = 'group'))
+
+reading_fe_diff_1st_kg <- coeftest(reading_fe_diff_1st_kg, vcovHC(reading_fe_diff_1st_kg, type = 'HC0', cluster = 'group'))
+reading_fe_diff_3rd_kg <- coeftest(reading_fe_diff_3rd_kg, vcovHC(reading_fe_diff_3rd_kg, type = 'HC0', cluster = 'group'))
+reading_fe_diff_5th_kg <- coeftest(reading_fe_diff_5th_kg, vcovHC(reading_fe_diff_5th_kg, type = 'HC0', cluster = 'group'))
+
+stargazer(reading_fe_diff_3rd_kg , reading_fe_diff_5th_kg )
+science_lm_X2 <- lm(science_kg_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , data= neverchange)
+
+
+science_fe_X2 <- plm(science_kg_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , 
+    data=neverchange,
+    index = c("S2_ID"),
+    model = "within")
+
+
+science_lm_X4 <- lm(science_1st_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, data= neverchange)
+
+science_fe_X4 <- plm(science_1st_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , 
+    data= neverchange , 
+    index = c("S2_ID"),
+    model = "within")
+
+
+science_lm_X7 <- lm(science_3rd_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 ,  data= neverchange)
+
+
+science_fe_X7 <- plm(science_3rd_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2 , 
+    data= neverchange, 
+    index = c("S2_ID"),
+    model = "within")
+
+
+
+science_lm_X9 <- lm(science_5th_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, data= neverchange, weights = W9C9P_20)
+
+science_fe_X9 <- plm(science_5th_spring ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X9 , 
+    data= neverchange, 
+    index = c("S2_ID"),
+    model = "within")
+
+science_lm_diff_1st_kg<-lm(science_diff_1st_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN+ single_parent_X2 , data= neverchange)
+
+
+science_lm_diff_3rd_kg<-lm(science_diff_3rd_kg ~ black + hispanic + asian + other + X1KAGE_R+ BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2,   data= neverchange )
+
+science_lm_diff_5th_kg<-lm(science_diff_5th_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2,  data= neverchange )
+
+stargazer(science_lm_diff_3rd_kg, science_lm_diff_5th_kg)
+
+science_fe_diff_1st_kg <- plm(science_diff_1st_kg~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= neverchange, 
+    index = c("S2_ID"),
+    model = "within")
+
+science_fe_diff_3rd_kg <- plm(science_diff_3rd_kg ~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= neverchange, 
+    index = c("S2_ID"),
+    model = "within")
+
+science_fe_diff_5th_kg <- plm(science_diff_5th_kg~ black + hispanic + asian + other + X1KAGE_R + BIRTH_WEIGHT + female + P1CHLDBK + booksqr + MOMOVER30 + X12SESL + WIC + MOMTEEN + single_parent_X2, 
+    data= neverchange, 
+    index = c("S2_ID"),
+    model = "within")
+
+science_fe_X2 <- coeftest(science_fe_X2, vcovHC(science_fe_X2, type = 'HC0', cluster = 'group'))
+science_fe_X4 <- coeftest(science_fe_X4, vcovHC(science_fe_X4, type = 'HC0', cluster = 'group'))
+science_fe_X7 <- coeftest(science_fe_X7, vcovHC(science_fe_X7, type = 'HC0', cluster = 'group'))
+science_fe_X9 <- coeftest(science_fe_X9, vcovHC(science_fe_X9, type = 'HC0', cluster = 'group'))
+
+science_fe_diff_1st_kg <- coeftest(science_fe_diff_1st_kg, vcovHC(science_fe_diff_1st_kg, type = 'HC0', cluster = 'group'))
+science_fe_diff_3rd_kg <- coeftest(science_fe_diff_3rd_kg, vcovHC(science_fe_diff_3rd_kg, type = 'HC0', cluster = 'group'))
+science_fe_diff_5th_kg <- coeftest(science_fe_diff_5th_kg, vcovHC(science_fe_diff_5th_kg, type = 'HC0', cluster = 'group'))
+
+stargazer(science_fe_diff_3rd_kg, science_fe_diff_5th_kg)
+stargazer(reading_lm_X2,reading_lm_X4, reading_lm_X7, reading_lm_X9, reading_lm_diff_1st_kg,reading_lm_diff_3rd_1st,reading_lm_diff_5th_3rd)
+stargazer(reading_fe_X2, reading_fe_X4,reading_fe_X7, reading_fe_X9, reading_fe_diff_1st_kg,reading_fe_diff_3rd_1st, reading_fe_diff_5th_3rd) 
+
+stargazer(science_lm_X2,science_lm_X4, science_lm_X7, science_lm_X9, science_lm_diff_1st_kg,science_lm_diff_3rd_1st,science_lm_diff_5th_3rd)
+stargazer(science_fe_X2, science_fe_X4,science_fe_X7, science_fe_X9, science_fe_diff_1st_kg,science_fe_diff_3rd_1st, science_fe_diff_5th_3rd) 
+
+table(reading_att$X12SESL)
+summary(df_clean$X12SESL)
+
+```
+
+# 5. Extension
+
+
+
+
+
