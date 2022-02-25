@@ -1,0 +1,791 @@
+---
+title: "Measurement Homework-3"
+author: "Navya Sureka"
+date: "09/10/2020"
+output:
+  pdf_document: default
+  html_document: default
+header-includes:
+- \usepackage{dcolumn}
+- \usepackage{color}
+- \usepackage{float}
+- \floatplacement{figure}{H}  #make every figure with caption = h, this was the fix
+- \usepackage{listings}
+fig_caption: yes
+---
+\color{blue}
+## 2.1 Calculation of the percentage of people who are “poor” according to 
+## American standards.
+\color{black}
+```{r, include = FALSE, warning =FALSE}
+list.of.packages <- c("tidyverse", "haven", "knitr","broom","stargazer")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages, repos = "http://cran.us.r-project.org")
+invisible(lapply(list.of.packages, library, character.only = TRUE))
+eu<-readRDS("silc")
+eu_pers<-readRDS("silc_pers")
+```
+
+```{r, include = FALSE, warning =FALSE}
+identical(eu_pers$hb030, eu_pers$rx030)
+#since the variables hb030 and rx030, are not really identical, and that the variable hb030 is in the household data set, we can actually use hb030, in reality.
+
+eu_pers$diff<- eu_pers$rx010 - eu_pers$rx020
+summary(is.na(eu_pers$rx010))
+sum(eu_pers$diff,na.rm= TRUE )
+eu <- subset(eu, eu$hb020=="UK"| eu$hb020=="ES" |eu$hb020=="DK")
+table(eu$hb020)
+
+eu_pers <- subset(eu_pers, eu_pers$hb020=="UK"| eu_pers$hb020=="ES" |eu_pers$hb020=="DK")
+table(eu_pers$hb020)
+```
+\color{blue}
+## GETTING THE REQUIRED DATASET
+\color{black}
+I curate my data set to contain only the three countries we need- UK, Denmark and Spain. All these countries have the same numbers representing different househlds, and therefore I use the _paste_ function to create a new _ID_ where Household 1 of UK would have the ID like- UK 1. Here, _hb020_ shows the Country code and _hb030_ shows the household code.
+```{r, warning =FALSE}
+eu$ID <- paste(eu$hb020, eu$hb030)
+eu_pers$ID <- paste( eu_pers$hb020, eu_pers$hb030)
+```
+
+```{r, include = FALSE, warning =FALSE}
+summary(eu$hy020)
+#check:
+summary(eu$hb020)
+summary(eu$ID)
+#same length
+#check:
+summary(eu_pers$hb020)
+summary(eu_pers$ID)
+#same length
+```
+
+The following transformation using the group_by and mutate function, helps us to get a dataset from silc_pers to gather person-wise information in each household. This data-set consists of the total household size, the number of old people in the household and the number of children. For this calculation, I used the variable rx010, because this variable doesn't have a large number of missing values as compared to rx020 and I checked the maximum difference in age between rx020(which is the age of the person at the income reference period) and rx010(the age at the time of the interview), and it was 2. So on an average a person's category as child or adult, and old  or not old will only be skewed, for the observations lying close to the ages - 18 or 65, which is a marginal impact and ignoring this, is better than to ignore the 271 missing values from the variable rx020.
+
+```{r, warning =FALSE, results='hide'}
+eu_pers.18<-eu_pers  %>%
+  select(rx010,ID)%>%
+  group_by(ID)%>%
+  mutate(Household_size=n())%>%
+  mutate(a.18 = ifelse (rx010 < 18, 1 ,0 ))%>%
+  group_by(ID,Household_size)%>%
+  summarise(Children= sum(a.18))%>%
+  ungroup()
+
+eu_pers.final<-eu_pers%>%
+  select(rx010, ID)%>%
+  group_by(ID)%>%
+  mutate(Household_size=n())%>%
+  mutate(Old = ifelse (rx010 >= 65, 1 ,0 ))%>%
+  group_by(ID,Household_size)%>%
+  summarise(Total_old= sum(Old))%>%
+  cbind(Children=eu_pers.18$Children)%>%
+  mutate(adults= Household_size - Children)%>%
+  ungroup()
+```
+
+```{r, include = FALSE, warning =FALSE}
+summary(is.na(eu_pers.final$Children))
+summary(is.na(eu_pers.final$Total_old))
+```
+
+I used the following code to impute thresholds to different households, based on the US thresholds from the csv file. The last part of the code, is to get back the country codes, so that we can separate the dataset based on these codes to help correct for Purchasing Power Parity accordingly.
+
+```{r, warning =FALSE}
+eu_pers.final$poverty_line <- 
+ifelse(eu_pers.final$Household_size==1 & eu_pers.final$Total_old==0, 10488, 
+ifelse(eu_pers.final$Household_size==1 & eu_pers.final$Total_old==1, 9669,
+ifelse(eu_pers.final$Household_size==2 & 
+         eu_pers.final$Total_old==0 & 
+         eu_pers.final$Children==0, 13500,
+ifelse(eu_pers.final$Household_size==2 & 
+         eu_pers.final$Total_old==0 & 
+         eu_pers.final$Children==1, 13896,
+ifelse(eu_pers.final$Household_size==2 & 
+         eu_pers.final$Total_old>=1 & 
+         eu_pers.final$Children==0, 12186,
+ifelse(eu_pers.final$Household_size==2 & 
+         eu_pers.final$Total_old>=1 & 
+         eu_pers.final$Children==1, 13843,
+ifelse(eu_pers.final$Household_size==3 & eu_pers.final$Children==0, 15769,
+ifelse(eu_pers.final$Household_size==3 & eu_pers.final$Children==1, 16227,              
+ifelse(eu_pers.final$Household_size==3 & eu_pers.final$Children==2, 16242,
+ifelse(eu_pers.final$Household_size==4 & eu_pers.final$Children==0, 20794,
+ifelse(eu_pers.final$Household_size==4 & eu_pers.final$Children==1, 21134,              
+ifelse(eu_pers.final$Household_size==4 & eu_pers.final$Children==2, 20444,
+ifelse(eu_pers.final$Household_size==4 & eu_pers.final$Children==3, 20516,
+ifelse(eu_pers.final$Household_size==5 & eu_pers.final$Children==0, 25076,
+ifelse(eu_pers.final$Household_size==5 & eu_pers.final$Children==1, 25441,              
+ifelse(eu_pers.final$Household_size==5 & eu_pers.final$Children==2, 24662,
+ifelse(eu_pers.final$Household_size==5 & eu_pers.final$Children==3, 24059,
+ifelse(eu_pers.final$Household_size==5 & eu_pers.final$Children==4, 23691,                   
+ifelse(eu_pers.final$Household_size==6 & eu_pers.final$Children==0, 28842,
+ifelse(eu_pers.final$Household_size==6 & eu_pers.final$Children==1, 28957,              
+ifelse(eu_pers.final$Household_size==6 & eu_pers.final$Children==2, 28360,
+ifelse(eu_pers.final$Household_size==6 & eu_pers.final$Children==3, 27788,
+ifelse(eu_pers.final$Household_size==6 & eu_pers.final$Children==4, 26938,                   
+ifelse(eu_pers.final$Household_size==6 & eu_pers.final$Children==5, 26434,                   
+ifelse(eu_pers.final$Household_size==7 & eu_pers.final$Children==0, 33187,
+ifelse(eu_pers.final$Household_size==7 & eu_pers.final$Children==1, 33394,              
+ifelse(eu_pers.final$Household_size==7 & eu_pers.final$Children==2, 32680,
+ifelse(eu_pers.final$Household_size==7 & eu_pers.final$Children==3, 32182,
+ifelse(eu_pers.final$Household_size==7 & eu_pers.final$Children==4, 31254,                   
+ifelse(eu_pers.final$Household_size==7 & eu_pers.final$Children==5, 30172,                   
+ifelse(eu_pers.final$Household_size==7 & eu_pers.final$Children==6, 28985,
+ifelse(eu_pers.final$Household_size==8 & eu_pers.final$Children==0, 37117,
+ifelse(eu_pers.final$Household_size==8 & eu_pers.final$Children==1, 37444,              
+ifelse(eu_pers.final$Household_size==8 & eu_pers.final$Children==2, 36770,
+ifelse(eu_pers.final$Household_size==8 & eu_pers.final$Children==3, 36180,
+ifelse(eu_pers.final$Household_size==8 & eu_pers.final$Children==4, 35342,                   
+ifelse(eu_pers.final$Household_size==8 & eu_pers.final$Children==5, 34278,                   
+ifelse(eu_pers.final$Household_size==8 & eu_pers.final$Children==6, 33171,
+ifelse(eu_pers.final$Household_size==8 & eu_pers.final$Children==7, 32890,
+ifelse(eu_pers.final$Household_size>8 & eu_pers.final$Children==0, 44649,
+ifelse(eu_pers.final$Household_size>8 & eu_pers.final$Children==1, 44865,              
+ifelse(eu_pers.final$Household_size>8 & eu_pers.final$Children==2, 44269,
+ifelse(eu_pers.final$Household_size>8 & eu_pers.final$Children==3, 43768,
+ifelse(eu_pers.final$Household_size>8 & eu_pers.final$Children==4, 42945,                    
+ifelse(eu_pers.final$Household_size>8 & eu_pers.final$Children==5, 41813,                    
+ifelse(eu_pers.final$Household_size>8 & eu_pers.final$Children==6, 40790,
+ifelse(eu_pers.final$Household_size>8 & eu_pers.final$Children==7, 40536,
+ifelse(eu_pers.final$Household_size>8 & eu_pers.final$Children>=8, 38975,NA
+))))))))))))))))))))))))))))))))))))))))))))))))
+
+summary(is.na(eu_pers.final$poverty_line))
+
+eu_pers.final$country <- stringr::str_extract(eu_pers.final$ID, "^.{2}")
+```
+I multiply the purchasing power parity to the respective thresholds, to get to the poverty lines corrected for the country's currency rather than in US dollars. There are no Missing values for the poverty thresholds calculated.
+```{r, warning =FALSE}
+eu_pers.final$poverty_line_PPP <- 
+ifelse(eu_pers.final$country=="DK", eu_pers.final$poverty_line*8.295,
+ifelse(eu_pers.final$country=="ES", eu_pers.final$poverty_line*0.737,
+ifelse(eu_pers.final$country=="UK", eu_pers.final$poverty_line*0.697,        
+       eu_pers.final$poverty_line)))%>%
+      round(., digits = 2)
+```
+\color{blue}
+## POVERTY THRESHOLDS
+\color{black}
+```{r, echo = FALSE, warning =FALSE}
+g<-mean(eu_pers.final$poverty_line_PPP[eu_pers.final$country=="UK"])
+g1<-mean(eu_pers.final$poverty_line_PPP[eu_pers.final$country=="ES"])
+g2<-mean(eu_pers.final$poverty_line_PPP[eu_pers.final$country=="DK"])
+g3<-mean(eu_pers.final$Household_size[eu_pers.final$country=="UK"])
+g4<-mean(eu_pers.final$Household_size[eu_pers.final$country=="ES"])
+g5<-mean(eu_pers.final$Household_size[eu_pers.final$country=="DK"])
+table<-data.frame(
+  country= c("UK", "Spain", "Denmark"),
+  Mean_Poverty_Thresholds = c(g,g1,g2),
+  Mean_Household_Size= c(g3,g4,g5)
+)
+kable(table,
+      caption = " Poverty Thresholds without accounting for Hosehold Weights (computed as per US definition) ",
+      align = c("c","c","c")
+      )
+```
+This table shows the mean poverty threshold(computed as per US definition), based on all the households with different categories of people, in the respective country's home currency. Table-2 shows these thresholds but weighted according to the household weights. The mean household threshold is fairly high for Denmark, where the currency used is Krones. The exchange rate of dollar for Krone is high getting us these high value. Also, it may be that the basket defining poverty in the US doesn’t fit Denmark well.
+The country-wise thresholds vary at such a large margin because in each country the standard of living is different, for instance, if we compare poverty threshold in a developed country, say America, the value of the threshold for a particular household, will exceed the poverty threshold for a household with same specification(number and age of members) in a developing country like India, when compared to in Rupee terms. Therefore, it becomes imperative to get the thresholds based on the least- expensive way to procure this basket of goods. This basket will be differently priced in the different countries and a household unable to purchase the basket in their respective country at their country prices and currency is said to be poor.
+
+\color{blue}
+## CALCULATING GROSS INCOME
+\color{black}
+To calculate the Gross Income as the variables _hy010_ in the Euro Stat Description. I followed the following steps, using the variable _hy020_ (the household disposable income) as the base of my formula
+\[ Gross Income(hy010) = 
+Disposable Income(hy020) + 
+Regular Taxes on Wealth(hy120g) + \]
+\[ Regular Interhousehold Cash Transfer(hy130g) +
+Tax on Income and Social Insurance Contributions (hy140g) 
+\]
+
+According to the definition of Gross Income from Euro-stat, we should also have added the variables-employer’s social insurance contributions(PY030G) and interest paid on mortgage (hy100g), but the variable for social insurance contributions is not present in the dataset and the variable HY100G has close to 12295 missing values, which is close to 44% of the observations, and I have chosen to ignore these variables, because adding them weakens our model and estimates of poverty, by reducing the number of observations.
+
+Note- Among the other variables I have taken into account, there are 56 missing values, systematically for Spain. This number of missing values when compared to the total observations in the data set is small- 0.2% and can be ignored, but compared to the total number of observations for Spain which is 12149 the missing values account for 0.4% of all the observations(Can be avoided because it is difficult to be able to predict what these values could be).
+
+I then try to restructure the gross income in line with the US definition,
+
+* Capital gains must not be added to the Gross Income Calculation, however, the variables _hy040_ and _hy090_ (Income from rental of a property or land and Interest, dividends, profit from capital investments in unincorporated business) in the Disposable Income, account for the capital income, which is different form capital gains and is an important source in the total gross income. Therefore, I do no subtract these from my accounting.
+
+* Housing Allowances must not be included, so, I subtract the variable for housing allowances- _hy070g_.
+
+\[ Gross Income(US definition)= Gross Income(hy010) - Housing Allowances(hy070g)\]
+
+After having computed this variable, I make two corrections-
+
+* I multiply my variable with _hy025_, which accounts for the within-household non-response inflation factor, and helps correct for family members who were missing during the survey.
+
+* I multiply also the variable with _hx010_, which is the exchange rate. Since we have our thresholds computed out of the PPP indices, we need to make sure that while comparing for poverty, we account for having the two amounts (the household income and the threshold) in the same currency.Thus, the _hx010_ is 1 for Spain as the currency used here is euro itself, for Denmark we convert the computed household incomes from euros to krones and for UK, we convert them into pounds.
+
+\[ Corrected Gross Income(US definition) = Gross Income(US definition) *\]  \[NonResponseInflationFactor(hy025) *Change Rate (hx010) \]
+
+Lastly, even though I have not taken into account _Imputed_ _Rent_ into my accounting for gross income because of data constraints, I realise it plays an important role for people who own their own houses and do not need to pay monthly rents towards housing. A country where more poeple are systematically more home-owners tend to thus have a lower poverty rate than a country where people still rent their housing. The exclusion of imputed rents, makes people richer if they exchange flat and rent to each other. The aim is to make countries comparison possible when there are different percentages of home owners or home renters. 
+```{r, include = FALSE, warning =FALSE}
+summary(eu$hy020)
+summary(eu$hy120g)
+summary(eu$hy130g)
+summary(eu$hy140g)
+summary(eu$hy070g)
+summary(eu$hy100g)
+summary(eu$hy090g)
+summary(eu$hy040g)
+summary(eu$hy025)
+eu$gross_income<- (eu$hy020 + eu$hy120g + eu$hy130g + eu$hy140g - eu$hy070g) * eu$hy025 * eu$hx010 
+eu$gross_income<- round(eu$gross_income, digits = 2)
+summary(is.na(eu$gross_income))
+56/27818 
+56/12149
+#0.2% of missing values- not a major chunk
+```
+
+```{r, include = FALSE, warning =FALSE, results='hide'}
+income <- subset(eu, select=c(ID, gross_income, db090))
+eu_pers.final<- merge(eu_pers.final, income, by = "ID")
+h<-lm(eu_pers.final$poverty_line_PPP[eu_pers.final$country=="UK"]~1, weights= eu_pers.final$db090[eu_pers.final$country=="UK"])
+h1<-lm(eu_pers.final$poverty_line_PPP[eu_pers.final$country=="ES"]~1,weights= eu_pers.final$db090[eu_pers.final$country=="ES"])
+h2<-lm(eu_pers.final$poverty_line_PPP[eu_pers.final$country=="DK"]~1,weights= eu_pers.final$db090[eu_pers.final$country=="DK"])
+stargazer(h,h1,h2)
+```
+\begin{table}[!htbp] \centering 
+  \caption{Mean Weighted Poverty Thresholds} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{3}{c}{\textit{Dependent variable:}} \\ 
+\cline{2-4} 
+\\[-1.8ex] &  United Kingdom & Denmark & Spain \\ 
+\\[-1.8ex] & (1) & (2) & (3)\\ 
+\hline \\[-1.8ex] 
+ Constant & 10,092.420$^{***}$ & 11,774.840$^{***}$ & 111,584.100$^{***}$ \\ 
+  & (32.131) & (30.800) & (447.396) \\ 
+  & & & \\ 
+\hline \\[-1.8ex] 
+Observations & 9,902 & 12,205 & 5,711 \\ 
+\hline 
+\hline \\[-1.8ex] 
+\textit{Note:}  & \multicolumn{3}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
+\end{tabular} 
+\end{table}
+
+```{r, include = FALSE, warning =FALSE}
+eu_pers.final$poor <- ifelse(eu_pers.final$gross_income < eu_pers.final$poverty_line_PPP, 1, 0)
+mean(eu_pers.final$poor, na.rm = TRUE)
+summary(eu_pers.final$poor)
+```
+
+\color{blue}
+## POVERTY RATES
+\color{black}
+```{r, echo = FALSE, warning =FALSE, results='hide'}
+a1<-lm(eu_pers.final$poor[eu_pers.final$country=="UK"]~1)
+a2<-lm(eu_pers.final$poor[eu_pers.final$country=="DK"]~1)
+a3<-lm(eu_pers.final$poor[eu_pers.final$country=="ES"]~1)
+a<- lm(eu_pers.final$poor~1)
+stargazer(a,a1,a2,a3)
+```
+\begin{table}[!htbp] \centering 
+  \caption{Poverty Rates- without Household weights correction} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lcccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{4}{c}{\textit{Dependent variable:}} \\ 
+\cline{2-5} 
+\\[-1.8ex] & Overall & United Kingdom & Denmark & Spain \\ 
+\\[-1.8ex] & (1) & (2) & (3) & (4)\\ 
+\hline \\[-1.8ex] 
+ Constant & 0.137$^{***}$ & 0.137$^{***}$ & 0.016$^{***}$ & 0.194$^{***}$ \\ 
+  & (0.002) & (0.003) & (0.002) & (0.004) \\ 
+  & & & & \\ 
+\hline \\[-1.8ex] 
+Observations & 27,762 & 9,902 & 5,711 & 12,149 \\ 
+\hline 
+\hline \\[-1.8ex] 
+\textit{Note:}  & \multicolumn{4}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
+\end{tabular} 
+\end{table} 
+
+\color{blue}
+## WEIGHTED HOUSEHOLD POVERTY RATES
+\color{black}
+We use the weights given as db090 in the dataset, to get to the fact about how much a particular household in the sample is representative of the population.
+For UK and Denmark the weighted Poverty Rates is higher than the non-weighted Poverty Rates, while for Spain the case is opposite.
+This may happen because the poor households in UK and Denmark are more representative of the population and therefore when these households are multiplied by bigger weights, we get higher poverty rates. In case of the Spanish Households, the poor households are comparatively less representative of the population and thus when multiplied by smaller weights, we get lower poverty rates( compared to when all households are weighted at 1).
+```{r, echo = FALSE, message= FALSE, warning =FALSE, results='hide'}
+l1<-lm(eu_pers.final$poor[eu_pers.final$country=="UK"]~1, weights = eu_pers.final$db090[eu_pers.final$country=="UK"] )
+l2<-lm(eu_pers.final$poor[eu_pers.final$country=="DK"]~1, weights = eu_pers.final$db090[eu_pers.final$country=="DK"] )
+l3<-lm(eu_pers.final$poor[eu_pers.final$country=="ES"]~1, weights = eu_pers.final$db090[eu_pers.final$country=="ES"] )
+l<-lm(eu_pers.final$poor~1, weights = eu_pers.final$db090)
+stargazer(l,l1,l2,l3)
+```
+\begin{table}[!htbp] \centering 
+  \caption{Poverty Rates- corrected for Household Weights} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lcccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{4}{c}{\textit{Dependent variable:}} \\ 
+\cline{2-5} 
+\\[-1.8ex] & Overall & United Kingdom & Denmark & Spain \\ 
+\\[-1.8ex] & (1) & (2) & (3) & (4)\\ 
+\hline \\[-1.8ex] 
+ Constant & 0.148$^{***}$ & 0.144$^{***}$ & 0.042$^{***}$ & 0.173$^{***}$ \\ 
+  & (0.002) & (0.004) & (0.003) & (0.003) \\ 
+  & & & & \\ 
+\hline \\[-1.8ex] 
+Observations & 27,762 & 9,902 & 5,711 & 12,149 \\ 
+\hline 
+\hline \\[-1.8ex] 
+\textit{Note:}  & \multicolumn{4}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
+\end{tabular} 
+\end{table} 
+
+\color{blue}
+## WEIGHTED INDIVIDUAL POVERTY RATES
+\color{black}
+I compute the new weights by using the formula: 
+\[ NewWeights= db090 * Household Size\]
+
+Also,there is no need to use different thresholds or the income comparisons, because, we don't assume that the earning member of the family uses his income on himself, therefore each individual from a poor household is considered poor. The calculation for these individual poverty rates helps to know the real poverty in a country, in the sense that if the poor households are big the weight given to that household increases( as it is multiplied by the household size)- determining that more people are in poverty. This fact about the number of poor people in the country is not accurately estimated using just the household weights.It is important to note from our tables- 4 and 5, that the weighted individual poverty rates are lower than the weighted household poverty rates. This implies that the weights on poor households have fallen as a result of these households having a smaller number of members. The Table- 5 shows that compared to the Table- 1, the mean household size for poor households is lower than the overall mean household size.
+
+```{r, echo = FALSE, warning =FALSE}
+r<-mean(eu_pers.final$Household_size[eu_pers.final$poor==1 & eu_pers.final$country=="UK"],na.rm= T)
+r1<-mean(eu_pers.final$Household_size[eu_pers.final$poor==1 & eu_pers.final$country=="DK"],na.rm= T)
+r3<-mean(eu_pers.final$Household_size[eu_pers.final$poor==1 & eu_pers.final$country=="ES"],na.rm= T)
+ta<-data.frame(
+  Country= c("UK", "Spain", "Denmark"),
+  Mean_Household_Size= c(r,r3,r1)
+)
+kable(ta,
+      caption = " Mean House-hold Size for Poor Households ",
+      align = c("c","c","c")
+      )
+
+```
+
+```{r, echo = FALSE, warning =FALSE, results='hide'}
+eu_pers.final$new_weights<- eu_pers.final$Household_size * eu_pers.final$db090
+
+c<- lm(eu_pers.final$poor~1, weights= eu_pers.final$new_weights )
+c1<- lm(eu_pers.final$poor[eu_pers.final$country=="UK"]~1, weights = eu_pers.final$new_weights[eu_pers.final$country=="UK"])
+c2<-lm(eu_pers.final$poor[eu_pers.final$country=="DK"]~1,weights =  eu_pers.final$new_weights[eu_pers.final$country=="DK"])
+c3<-lm(eu_pers.final$poor[eu_pers.final$country=="ES"]~1,weights = eu_pers.final$new_weights[eu_pers.final$country=="ES"])
+stargazer(c,c1,c2,c3) 
+
+```
+
+\begin{table}[!htbp] \centering 
+  \caption{Poverty Rates for Individuals in each country} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lcccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{4}{c}{\textit{Dependent variable:}} \\ 
+\cline{2-5} 
+\\[-1.8ex] &  Overall & United Kingdom & Denmark & Spain\\ 
+\\[-1.8ex] & (1) & (2) & (3) & (4)\\ 
+\hline \\[-1.8ex] 
+ Constant & 0.130$^{***}$ & 0.126$^{***}$ & 0.031$^{***}$ & 0.149$^{***}$ \\ 
+  & (0.002) & (0.003) & (0.002) & (0.003) \\ 
+  & & & & \\ 
+\hline \\[-1.8ex] 
+Observations & 27,762 & 9,902 & 5,711 & 12,149 \\ 
+\hline 
+\hline \\[-1.8ex] 
+\textit{Note:}  & \multicolumn{4}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
+\end{tabular} 
+\end{table}
+
+
+```{r, echo = FALSE, warning =FALSE}
+plot(eu_pers.final$Household_size[eu_pers.final$country=="UK" & eu_pers.final$gross_income >0], eu_pers.final$gross_income[eu_pers.final$country=="UK" & eu_pers.final$gross_income>0], xlab="Number of household members", ylab="Gross Income (U.S. Definition)", main="Gross Income and Household members in UK")
+plot(eu_pers.final$Household_size[eu_pers.final$country=="DK" & eu_pers.final$gross_income >0], eu_pers.final$gross_income[eu_pers.final$country=="DK" & eu_pers.final$gross_income>0], xlab="Number of household members", ylab="Gross Income (U.S. Definition)", main="Gross Income and Household members in DenmarK")
+plot(eu_pers.final$Household_size[eu_pers.final$country=="ES" & eu_pers.final$gross_income >0], eu_pers.final$gross_income[eu_pers.final$country=="ES" & eu_pers.final$gross_income>0], xlab="Number of household members", ylab="Gross Income (U.S. Definition)", main="Gross Income and Household members in Spain")
+o<-lm(eu_pers.final$Household_size[eu_pers.final$poor== 1]~ eu_pers.final$gross_income[eu_pers.final$poor== 1])
+```
+The table- 7 shows the computations from the Household Size regressed on the Gross Income. 
+\begin{table}[!htbp] \centering 
+  \caption{Relationship between Household Size and Income for Poor Households} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{1}{c}{\textit{Dependent variable:}} \\ 
+\cline{2-2} 
+\\[-1.8ex] & HouseHold Size \\ 
+\hline \\[-1.8ex] 
+ Gross Income & 0.00001$^{***}$ \\ 
+  & (0.00000) \\ 
+  & \\ 
+ Constant & 2.272$^{***}$ \\ 
+  & (0.027) \\ 
+  & \\ 
+\hline \\[-1.8ex] 
+Observations & 3,810 \\ 
+\hline 
+\hline \\[-1.8ex] 
+\textit{Note:}  & \multicolumn{1}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
+\end{tabular} 
+\end{table}
+
+\newpage
+
+\color{blue}
+## 2.2 Calculation of the percentage of people who are “at risk of poverty” according
+## to the EU definition.
+\color{black}
+
+In the calculation based on the EU method, I find the Equivalised Household size, given as hx050 in the variable description.
+\[Equivalised Household size(hx050) = 1+ 0.5 * (No. of Adults -1) + 0.3 * No.ofChildren\]
+
+It should be noted that in this case I had to use the variable _rx020_ which is the age at the end of income reference period, because the formula requires us to do so. Also, the age limit for children category is 14 years, rather than the 18 years in the earlier case.
+Also, the EU calculations use the net income of households(or the household disposable income), which is directly given as variable _hy020_. To get to the Equivalised Adult Income, I use:
+\[Equivalised Adult Income= (Household Disposable Income(hy020) *InflationFactor(hy025))/\] \[Equivalised Household size(hx050)\]
+
+```{r, include = FALSE, warning =FALSE}
+
+eu_pers.14<-eu_pers  %>%
+  select(rx020,ID)%>%
+  group_by(ID)%>%
+  mutate(a.14 = ifelse (rx020 < 14, 1 ,0 ))%>%
+  group_by(ID)%>%
+  summarise(Children= sum(a.14))%>%
+  ungroup()
+eu_new<- eu_pers.final%>%
+  select(ID, Household_size, country, db090,new_weights )%>%
+  cbind(Children=eu_pers.14$Children)%>%
+  mutate(Adults=Household_size-Children )%>%
+  mutate(Equivalised_Household_size= ifelse (Household_size>1, (1+ 0.5 * (Adults -1) + 0.3 * Children), 1))
+
+e_income <- subset(eu, select=c(ID, hy020, hy025))
+eu_new<- merge(eu_new, e_income, by = "ID")
+eu_new$Equivalised_Household_income<- (eu_new$hy020 *eu_new$hy025)/ eu_new$Equivalised_Household_size
+```
+
+For calculating the median Equivalised Adult Income, I use the weighted median, with weights= db090. We get the following weighted medians;
+```{r, echo = FALSE, warning =FALSE, message='hide'}
+m1<-median((rep(eu_new$Equivalised_Household_income[eu_new$country=="UK"], times = eu_new$db090[eu_new$country=="UK"])))
+m2<-median((rep(eu_new$Equivalised_Household_income[eu_new$country=="DK"], times = eu_new$db090[eu_new$country=="DK"])))
+m3<-median((rep(eu_new$Equivalised_Household_income[eu_new$country=="ES"], times = eu_new$db090[eu_new$country=="ES"])), na.rm=TRUE)
+p_uk<- m1*0.6
+p_dk<- m2*0.6
+p_es<- m3*0.6
+tab<-data.frame(
+  Country= c("UK", "Spain", "Denmark"),
+  Weighted_Adult_Equivalised_Median_Incomes= c(m1,m3,m2),
+  Poverty_Thresholds=c(p_uk,p_es,p_dk)
+)
+kable(tab,
+      caption = "Country-wise Weighted Adult Equivalised Median Incomes and Poverty Thresholds(Using EU definition)  ",
+      align = c("c","c","c")
+      )
+eu_new$poor<- ifelse(eu_new$country=="UK" & eu_new$Equivalised_Household_income< p_uk,1,
+             ifelse(eu_new$country=="DK" & eu_new$Equivalised_Household_income< p_dk,1,
+             ifelse(eu_new$country=="ES" & eu_new$Equivalised_Household_income< p_es,1,0)))
+                    
+x1<-lm(eu_new$poor[eu_new$country=="UK"]~1)
+x2<-lm(eu_new$poor[eu_new$country=="DK"]~1)
+x3<-lm(eu_new$poor[eu_new$country=="ES"]~1)
+x<- lm(eu_new$poor~1)
+```
+```{r, echo = FALSE, warning =FALSE, message='hide', results='hide'}
+stargazer(x,x1,x2,x3)                     
+```
+\color{blue}
+## POVERTY RATES
+\color{black}
+
+Table-8 shows the poverty rates without consideration of Household weights. On taking into account the Household weights, we get the poverty rates as shown in Table-9. In comparison to the Non-weighted Poverty Rates the Weighted Household Poverty Rates for UK is marginally the same, while for Denmark, it almost doubles and for Spain, it is lowered by close to 3%.
+One can believe that the poor households in the sample for UK is quite representative of the poor household in the population, while the poor households in the sample for Denmark have a much higher weight applied leading to much higher Weighted Household Poverty Rates than the case where all households are weighed equally.It means that poor households in the sample have a larger representation in the population. For Spain, the weights on the poor households in the sample is lower and thus these households, are less representative of the households in the population,leading to lower Weighted Household Poverty Rates.
+
+\begin{table}[!htbp] \centering 
+  \caption{Poverty Rates without Household Weights} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lcccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{4}{c}{\textit{Dependent variable:}} \\ 
+\cline{2-5} 
+\\[-1.8ex] & Overall & United Kingdom & Denmark & Spain \\ 
+\\[-1.8ex] & (1) & (2) & (3) & (4)\\ 
+\hline \\[-1.8ex] 
+ Constant & 0.180$^{***}$ & 0.186$^{***}$ & 0.062$^{***}$ & 0.230$^{***}$ \\ 
+  & (0.002) & (0.004) & (0.003) & (0.004) \\ 
+  & & & & \\ 
+\hline \\[-1.8ex] 
+Observations & 27,762 & 9,902 & 5,711 & 12,149 \\ 
+\hline 
+\hline \\[-1.8ex] 
+\textit{Note:}  & \multicolumn{4}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
+\end{tabular} 
+\end{table} 
+
+```{r, echo = FALSE, warning =FALSE, results='hide'}
+y1<-lm(eu_new$poor[eu_new$country=="UK"]~1,weights= eu_new$db090[eu_new$country=="UK"])
+y2<-lm(eu_new$poor[eu_new$country=="DK"]~1, weights= eu_new$db090[eu_new$country=="DK"])
+y3<-lm(eu_new$poor[eu_new$country=="ES"]~1, weights= eu_new$db090[eu_new$country=="ES"])
+y<- lm(eu_new$poor~1,weights= eu_new$db090)
+stargazer(y,y1,y2,y3) 
+```
+
+\color{blue}
+## WEIGHTED HOUSEHOLD POVERTY RATES
+\color{black}
+
+\begin{table}[!htbp] \centering 
+  \caption{Poverty Rates with Household Weights} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lcccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{4}{c}{\textit{Dependent variable:}} \\ 
+\cline{2-5} 
+\\[-1.8ex] & Overall & United Kingdom & Denmark & Spain \\ 
+\\[-1.8ex] & (1) & (2) & (3) & (4)\\ 
+\hline \\[-1.8ex] 
+ Constant & 0.180$^{***}$ & 0.188$^{***}$ & 0.121$^{***}$ & 0.205$^{***}$ \\ 
+  & (0.002) & (0.004) & (0.004) & (0.004) \\ 
+  & & & & \\ 
+\hline \\[-1.8ex] 
+Observations & 27,762 & 9,902 & 5,711 & 12,149 \\ 
+\hline 
+\hline \\[-1.8ex] 
+\textit{Note:}  & \multicolumn{4}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
+\end{tabular} 
+\end{table}
+
+```{r, echo = FALSE, warning =FALSE, results='hide'}
+
+z1<-lm(eu_new$poor[eu_new$country=="UK"]~1,weights= eu_new$new_weights[eu_new$country=="UK"])
+z2<-lm(eu_new$poor[eu_new$country=="DK"]~1, weights= eu_new$new_weights[eu_new$country=="DK"])
+z3<-lm(eu_new$poor[eu_new$country=="ES"]~1, weights= eu_new$new_weights[eu_new$country=="ES"])
+z<- lm(eu_new$poor~1, weights= eu_new$new_weights)
+stargazer(z,z1,z2,z3) 
+
+```
+
+
+```{r, echo = FALSE, warning =FALSE}
+f<-mean(eu_new$Household_size[eu_new$poor[eu_new$country=="UK"]==1])
+f1<-mean(eu_new$Household_size[eu_new$poor[eu_new$country=="DK"]==1])
+f2<-mean(eu_new$Household_size[eu_new$poor[eu_new$country=="ES"]==1], na.rm= T)
+P<-data.frame(
+  Country= c("UK", "Spain", "Denmark"),
+  Mean_Household_Size= c(f,f2,f1)
+)
+kable(P,
+      caption = " Mean House-hold Size for Poor Households ",
+      align = c("c","c","c")
+      )
+```
+\color{blue}
+## WEIGHTED INDIVIDUAL POVERTY RATES
+\color{black}
+Weighted Individual Poverty Rates, are lower than the Weighted Household Poverty Rates. This is a similar observation as in case of Poverty rates calculated using US definition. The weights used in this case is the new weights given by:
+\[ NewWeights= db090 * Household Size\]
+If the household size is smaller, the resulting new weights will be smaller and thus result in lower estimates of Poverty Rates, than the weighted household poverty rates. In the Table- we see that the mean household size for poor household(as per the EU Definition) is almost similar to the ones calculated in Table-1. Thus the reason for this, can be because of the way the Equivalised Household Size is calculated 
+
+\begin{table}[!htbp] \centering 
+  \caption{Poverty Rates with Individual Weights} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lcccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{4}{c}{\textit{Dependent variable:}} \\ 
+\cline{2-5} 
+\\[-1.8ex] & Overall & United Kingdom & Denmark & Spain\\ 
+\\[-1.8ex] & (1) & (2) & (3) & (4)\\ 
+\hline \\[-1.8ex] 
+ Constant & 0.178$^{***}$ & 0.177$^{***}$ & 0.089$^{***}$ & 0.190$^{***}$ \\ 
+  & (0.002) & (0.004) & (0.004) & (0.004) \\ 
+  & & & & \\ 
+\hline \\[-1.8ex] 
+Observations & 27,762 & 9,902 & 5,711 & 12,149 \\ 
+\hline 
+\hline \\[-1.8ex] 
+\textit{Note:}  & \multicolumn{4}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
+\end{tabular} 
+\end{table} 
+
+\color{blue}
+## OXFORD SCALE ADJUSTMENTS
+\color{black}
+I have tried to impute the measure of Equivalised Household size using the Oxford scale, getting the following formula;
+\[Equivalised Household size(hx050) = 1+ 0.7 * (No. of Adults -1) + 0.5 * No.ofChildren\]
+I get the following tables:
+
+```{r, include = FALSE, warning =FALSE, results='hide'}
+eu_oxford<- eu_new%>%
+  mutate(Equivalised_oxford= ifelse (Household_size>1, (1+ 0.7 * (Adults -1) + 0.5 * Children), 1))%>%
+mutate(Equivalised_oxford_income<- (hy020 *hy025)/Equivalised_oxford)
+
+n1<-median((rep(eu_oxford$Equivalised_oxford_income[eu_oxford$country=="UK"], times = eu_oxford$db090[eu_oxford$country=="UK"])))
+n2<-median((rep(eu_oxford$Equivalised_oxford_income[eu_oxford$country=="DK"], times = eu_oxford$db090[eu_oxford$country=="DK"])))
+n3<-median((rep(eu_oxford$Equivalised_oxford_income[eu_oxford$country=="ES"], times = eu_oxford$db090[eu_oxford$country=="ES"])), na.rm=TRUE)
+p_o_uk<- n1*0.6
+p_o_dk<- n2*0.6
+p_o_es<- n3*0.6
+eu_oxford$o_poor<- ifelse(eu_oxford$country=="UK" & eu_oxford$Equivalised_oxford_income< p_o_uk,1,
+             ifelse(eu_oxford$country=="DK" & eu_oxford$Equivalised_oxford_income< p_o_dk,1,
+             ifelse(eu_oxford$country=="ES" & eu_oxford$Equivalised_oxford_income< p_o_es,1,0)))
+
+tab1<-data.frame(
+  Country= c("UK", "Spain", "Denmark"),
+  Weighted_Adult_Equivalised_Median_Incomes= c(n1,n3,n2),
+  Poverty_Thresholds=c(p_o_uk,p_o_es,p_o_dk)
+)
+kable(tab1,
+      caption = "Country-wise Weighted Adult Equivalised Median Incomes and Poverty Thresholds(Using Oxford Scale)  ",
+      align = c("c","c","c")
+      )
+o1<-lm(eu_oxford$o_poor[eu_oxford$country=="UK"]~1, weights = eu_oxford$db090[eu_oxford$country=="UK"])
+o2<-lm(eu_oxford$o_poor[eu_oxford$country=="DK"]~1, weights = eu_oxford$db090[eu_oxford$country=="DK"])
+o3<-lm(eu_oxford$o_poor[eu_oxford$country=="ES"]~1, weights = eu_oxford$db090[eu_oxford$country=="ES"])
+stargazer(o1,o2,o3)
+```
+As one can see from the table, the new poverty thresholds are lowered, and one may expect that poverty rates would fall as a lower threshold implies lesser number of people not having that income, however, from the Tables we can compare that the poverty rates increases.This is because households with large number of children, now place greater weight (0.5 instead of 0.3) which increases the equivalised household size, which in turn reduces the Adult Equivalised Income , leading more and more households to fall below the new poverty thresholds. 
+
+\begin{table}[!htbp] \centering 
+  \caption{Weighted Household Poverty Rates using the Oxford scale} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{3}{c}{\textit{Dependent variable:}} \\ 
+\cline{2-4} 
+\\[-1.8ex]  & United Kingdom & Denmark & Spain \\ 
+\\[-1.8ex] & (1) & (2) & (3)\\ 
+\hline \\[-1.8ex] 
+ Constant & 0.191$^{***}$ & 0.101$^{***}$ & 0.193$^{***}$ \\ 
+  & (0.004) & (0.004) & (0.004) \\ 
+  & & & \\ 
+\hline \\[-1.8ex] 
+Observations & 9,902 & 5,711 & 12,149 \\ 
+\hline 
+\hline \\[-1.8ex] 
+\textit{Note:}  & \multicolumn{3}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
+\end{tabular} 
+\end{table} 
+
+```{r, include = FALSE, warning =FALSE,results='hide'}
+o4<-lm(eu_oxford$o_poor[eu_oxford$country=="UK"]~1, weights = eu_oxford$new_weights[eu_oxford$country=="UK"])
+o5<-lm(eu_oxford$o_poor[eu_oxford$country=="DK"]~1, weights = eu_oxford$new_weights[eu_oxford$country=="DK"])
+o6<-lm(eu_oxford$o_poor[eu_oxford$country=="ES"]~1, weights = eu_oxford$new_weights[eu_oxford$country=="ES"])
+stargazer(o4,o5,o6)
+```
+\begin{table}[!htbp] \centering 
+  \caption{Weighted Individual Poverty Rates using the Oxford scale} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{3}{c}{\textit{Dependent variable:}} \\ 
+\cline{2-4} 
+\\[-1.8ex]  & United Kingdom & Denmark & Spain \\ 
+\\[-1.8ex] & (1) & (2) & (3)\\ 
+\hline \\[-1.8ex] 
+ Constant & 0.204$^{***}$ & 0.093$^{***}$ & 0.200$^{***}$ \\ 
+  & (0.004) & (0.004) & (0.004) \\ 
+  & & & \\ 
+\hline \\[-1.8ex] 
+Observations & 9,902 & 5,711 & 12,149 \\ 
+\hline 
+\hline \\[-1.8ex] 
+\textit{Note:}  & \multicolumn{3}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
+\end{tabular} 
+\end{table} 
+
+\color{blue}
+## 3) Identify 3 reasons which explain why the US and EU definitions lead to 
+## different poverty rates for households from United Kingdom, Spain and Denmark. Justify
+your answer.
+\color{black}
+ While both the measures are in line with measuring monetary poverty,there are certain stark differences that can be pointed out;
+ 
+* RELATIVISM vs.ABSOLUTISM OF DIFFERENT POVERTY MEASURES:
+While the US method distinguishes a poor from a non-poor household, by the resources that the household has, the EU method involves setting a relative poverty threshold- which is measured by a proportion of the median income. Thus, the US poverty thresholds seems to be absolute and the EU thresholds relative to the distance from the “normal income” threshold.
+US poverty thresholds are based on the least cost needed to purchase a basket of basic needs, comprised of food and non-food components. These baskets vary based on household types and thus also the cost required to buy it changes, vis-a-vis a change in the poverty thresholds. The food component is the least expensive basket of products that can give a certain standard level of nutrition to the family members. The Non-food component, is the determining factor based on the type of people in the family- old people need resources to access to health facilities while, children need access to education. If all incomes get doubled(with no change in inflation), then a family who is able to purchase the required basket, moves out of poverty.
+EU poverty threshold on the other hand is a relative measure, considering a person poor if that person earns lesser than a proportion of what a person normally earns in that country. The measure of poverty doesn't change if all incomes are doubled, so a person who earns less than the standard, is always relatively poor.
+
+* DIFFERENT ASPECTS OF POVERTY CALCULATION:
+
+-- The Definition of Income: While the US method uses Gross Income,we take into account the income of people before the tax deductions or transfers have taken place. In a way the EU method accounts for the disposable income which is what the person actually has left to spend on his needs. From the US way of calculating gross income, we removein-kind transfers and capital gains. 
+
+-- The Concept of Household Size: In the US definition, anyone below 18 is a child, while according to the EU definition anyone below 14 is a child. There are multiple thresholds for the US definition and the thresholds apply to a household based on how many members they have and if those members are old or children. The threshold according to the EU definition is singular and not specific to the needs of the household members.
+
+\color{blue}
+## 4) Measures of poverty vs. “subjective” perceptions of financial distress
+\color{black}
+To analyse the “subjective” perceptions of financial distress, I take the variable- HS120: (Ability to make ends meet). The variable takes the values between 1-6 on the following scale:
+1 with great difficulty
+2 with difficulty
+3 with some difficulty
+4 fairly easily
+5 easily
+6 very easily
+Note that, I was unable to take the cross tabulation for Spain, because of the 56 missing values. From the cross-tabulation, for UK and Denmark, I draw the following conclusions:
+
+In UK, close to 13% of poor households as calculated by US definition, chose a value (4-6), indicating it was fairly to very easy for them to make ends meet. In contrast, in Denmark, close to 53% of poor households as calculated by US definition, chose a value (4-6), indicating, subjectively, more poor people self-declare that they are able to make ends meet despite being poor.
+
+According to the EU definition of Poverty, 46% of the poor people in UK chose a value (4-6), indicating it was fairly to very easy for them to make ends meet, and in Denmark, close to 65% of poor households self-declare that they are able to make ends meet despite being poor.
+
+This draws attention to the fact that, even if the poverty thresholds segregate people as poor/non-poor, their subjective perspective about 'financial distress' depends on their attitude about life. While concerned with the previous variable, the poor people of Denmark seem to be systematically better off subjectively, on their own account and satisfaction levels.
+
+\color{black}
+```{r, echo = FALSE, warning =FALSE}
+library(descr)
+CrossTable(eu_pers.final$poor[eu_pers.final$country=="UK"], eu$hs120[eu$hb020=="UK"], digits=2,prop.chisq=F, prop.r=TRUE, prop.c=TRUE, prop.t=TRUE, na.rm= TRUE)
+CrossTable(eu_pers.final$poor[eu_pers.final$country=="DK"], eu$hs120[eu$hb020=="DK"], digits=2,prop.chisq=F, prop.r=TRUE, prop.c=TRUE, prop.t=TRUE, na.rm= TRUE)
+CrossTable(eu_new$poor[eu_new$country=="UK"], eu$hs120[eu$hb020=="UK"], digits=2,prop.chisq=F, prop.r=TRUE, prop.c=TRUE, prop.t=TRUE, na.rm= TRUE)
+CrossTable(eu_new$poor[eu_new$country=="DK"], eu$hs120[eu$hb020=="DK"], digits=2,prop.chisq=F, prop.r=TRUE, prop.c=TRUE, prop.t=TRUE, na.rm= TRUE)
+```
+
+In a second example, I take the variable- HS070, where people answer the question: Do you have a telephone (including mobile phone)? 
+The responses recorded are:
+1 - yes
+2 no - cannot afford
+3 no - other reason
+For Denmark, all the households below Poverty line, have a mobile phone, while in US close 2% of the poor households don't have a telephone or mobile-1 % of who cannot afford and the rest don't have it for other reasons. For Spain around 6% of the poor households don't own a mobile or telephone.
+This helps us in examining the subjectivity of necessities for a decent life. This variable would have shown higher percent of poor not affording a mobile phone in developing countries like India and Bangladesh, where other basic goods like food are not available to the poor masses. The definition of what is the basic basket that the poor should afford is thus a subject that receives great attention.
+
+```{r, echo = FALSE, warning =FALSE}
+CrossTable(eu_pers.final$poor[eu_pers.final$country=="UK"], eu$hs070[eu$hb020=="UK"], digits=2,prop.chisq=F, prop.r=TRUE, prop.c=TRUE, prop.t=TRUE, na.rm= TRUE)
+CrossTable(eu_pers.final$poor[eu_pers.final$country=="DK"], eu$hs070[eu$hb020=="DK"], digits=2,prop.chisq=F, prop.r=TRUE, prop.c=TRUE, prop.t=TRUE, na.rm= TRUE)
+CrossTable(eu_pers.final$poor[eu_pers.final$country=="ES"], eu$hs070[eu$hb020=="ES"], digits=2,prop.chisq=F, prop.r=TRUE, prop.c=TRUE, prop.t=TRUE, na.rm= TRUE)
+CrossTable(eu_new$poor[eu_new$country=="UK"], eu$hs070[eu$hb020=="UK"], digits=2,prop.chisq=F, prop.r=TRUE, prop.c=TRUE, prop.t=TRUE, na.rm= TRUE)
+CrossTable(eu_new$poor[eu_new$country=="DK"], eu$hs070[eu$hb020=="DK"], digits=2,prop.chisq=F, prop.r=TRUE, prop.c=TRUE, prop.t=TRUE, na.rm= TRUE)
+CrossTable(eu_new$poor[eu_new$country=="ES"], eu$hs070[eu$hb020=="ES"], digits=2,prop.chisq=F, prop.r=TRUE, prop.c=TRUE, prop.t=TRUE, na.rm= TRUE)
+
+```
+\color{blue}
+## 5) Hypothesis underlying the US Definition of Poverty (EXPLICIT)
+\color{black}
+* The Basic Consumption Basket for all the goods remains the same. 
+* People care about nutrition levels, and will surely adhere to those standards.
+* The hypothesis of gross income being indicative of poverty. There 
+* The exclusion of in-kind transfers, which is a huge part of social policy- food stamps, housing allowances. Usually, the Welfare State undertakes these policies to uplift the poor and an exclusion of the same means little sense if we need to calculate how poverty rate have altered because of these social policies.
+* The varied subjective perceptions about poverty remains constant across countries, this is indeed not very true. The perception of poor in a developed and an underdeveloped or developing country is totally different.
+* The Basket of basic goods is not a very dynamic concept, which is faulty because the products available in the market today have developed better as per the needs of the people. Also, there needs to also be a logic why the basket of preferred goods would remain same across so many countries under our comparisons. 
+* Also, an important factor to consider for US definition of Poverty Rates is how they change with price changes and whether the revisions based on the inflation rate is accurate and regularly done.
+
+\color{blue}
+## Hypothesis underlying the EU Definition of Poverty (EXPLICIT)
+\color{black}
+* The arbitrariness of setting 60% of the median net adult equivalised income as the only threshold. This takes for granted the households which do not look normal (same as/ close to the median). There is need to make more inclusions or sub-categories for formulating thresholds- not all households can be expected to be of same size as or earning the similar remuneration as the median-income threshold country.
+* The arbitrariness of setting the scale for the OECD equivalizing, and the rationale behind it, also, the appropriateness of being able to use it for different countries and whether we need to make corrections to it.
+* The European standard of taking the relative poverty is a good way to mask the effect of a crisis, where the incomes of even the median get shifted lower than their initial levels,and, thus the change in poverty is not as much the real effect of the crisis.
+* This method was developed initially to assist in making comparisions in poverty between different countries.
+
+Some overall hypothesis which can be thought about:(IMPLICIT)
+
+* Both the measures choose Income variables to account for poverty, rather than the variables for wealth or consumption. ALso, the account excludes Non-monetary consumption, Food stamps, public goods, public services and Agricultural production ( which are important components for developing countries).
+* All members within a poor household are poor. In reality, studies show that a cash transfer to the father or the mother has different impact on the child,especially in cultures where one tends to favour boys over girls.
+* Little emphasis on health, education in the respective Poverty definitions, even though either plays an important role and is a service that most poor people get excluded from, unless the Government makes provisions for it.
+
+Improvements that can be made:
+
+* To make the definitions more full-proof,there is a need to keep the factors of arbitrariness, the 60% of median or the scales for calculating equivalised household size, more dynamic, so that our poverty measures remain relevant through time and give us better estimates for comparisons.
+* There is need to make the poverty threshold calculations more inclusive especially in case of the EU definition, by taking into account how a large number of households which may not be representative of the median income or size. There can be inclusions of other categories- like the households with disabled persons, in the US threshold calculations. 
+* There is need to keep the poverty measures dynamic, so that these measures don't lose relevance and can still be used for comparisons to newer measures. The dynamism may be imbibed by allowing the basket of commodities in the US definition and the prices or nutrition levels representative of this basket to change as per the needs of the time.
+
+

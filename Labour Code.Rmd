@@ -1,0 +1,575 @@
+---
+title: "Measurement -5"
+author: "Navya Sureka"
+date: "10/11/2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r, include = FALSE, warning =FALSE}
+list.of.packages <- c("tidyverse", "haven", "knitr","broom","stargazer","readstata13","descr")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages, repos = "http://cran.us.r-project.org")
+invisible(lapply(list.of.packages, library, character.only = TRUE))
+l<- read_dta("lfshwk_fr11.dta")
+l2<- read_dta("lfshwk_fr12.dta")
+```
+ \textbf{Analyzing the French Labor Force}
+
+ \textbf{Qa) Define the labor force participation rate, and the unemployment rate.}
+
+According to the 13th ILO conference, 
+The labour force or "currently active population" comprises all persons who fulfil the requirements for inclusion among the employed or the unemployed as defined below,
+
+\textbf{Employment:}
+The "employed" comprise all persons above a specified age who during a specified brief period, usually one week, were in the following categories:
+
+-paid employment(at work or not)
+
+-self-employment
+
+There are specific conditions applicable for those missing from work in the reference period like illness or injury, holiday or vacation,strike or lockout, educational or training leave,maternity or parental leave,reduction in economic activity, temporary dis-organisation or suspension of work due to such reasons as bad weather, mechanical or electrical breakdown, or shortage of raw materials or fuels.
+
+\textbf{Unemployment:}
+The unemployed comprise all persons of working age who were:
+
+a) without work during the reference period, i.e. were not in paid employment or self-employment; 
+
+b) currently available for work,i.e. were available for paid employment or self-employment during the reference period; and
+
+c) seeking work, i.e. had taken specific steps in a specified recent period to seek paid employment or self employment.
+
+
+\textbf{Working- age population:}
+It is the population above the legal working age, but for statistical purposes it comprises all persons above a specified minimum age threshold for which an inquiry on economic activity is made. To favour international comparability, the working-age population is often defined as all persons aged 15 and older, but this may vary from country to country based on national laws and practices (some countries also apply an upper age limit). Thus, the Working age Population includes the Labour Force(in the working age) and the Inactive population (all persons who were not employed or unemployed during the brief reference period because of attendance at educational institutions, engagement in household duties, retirement or old age,or infirmity or disablement). There are two contested notions of working age:
+
+1) Anyone older than 15 years(INSEE uses this)
+
+2) Anyone between 15 years and 65 years(or the retirement age fixed by the country)
+
+Having defined the definitions, the different rates are given as following:
+
+\[Labour Force Participation Rate=\frac{Labour Force}{Total Working Age Population} * 100\]
+
+\[Unemployment Rate=\frac{Unemployed}{Labour Force}* 100\]
+
+Note: The Employment Rate is calculated as below:
+\[Employment Rate=\frac{Employed}{Total Working Age Population}*100\]
+Thus the unemployment and the employment rates do not add up to the Labour Force Participation Rates.
+
+\textbf{Qb)Compute the official "employment rate (employment-to-population rate) and unemployment rate in
+France in 2011 and 2012. Explain your computations.}
+
+For the Official Employment and Unemployment Rates I use the INSEE definition to form a dummy for employed and another for the unemployed using mutate and ifelse, as below
+
+\textbf{Employed population}
+\begin{enumerate}
+\item 15 to 74 yo that has done at least 1 hour of paid work during the reference week
+\item unpaid work for a relative’s business which was not occasional and unpaid work done in internships(a distinction was made in 2011 INSEE stats between productive and non productive internships and I include internships which involved the person doing work of the same nature as that of their colleagues and not the work placement aimed solely at getting to know how a business or department works)
+\item	Or has not worked during the reference week but:
+ \begin{itemize}
+\item	Either has a job and is on paid vacation, parental leave, part time job, training course paid by the employer, technical unemployment, strike. 
+\item	Or is on sick leave for less than a year
+\item	Or is on parental or other leave, unpaid by the employer for less than 3 months
+\end{itemize}
+\item	Or is over 75 years old, with a job
+\end{enumerate}
+
+\textbf{Unemployed population}
+\begin{enumerate}
+\item Not employed : We find the Employed population first and conditioning on those who are not employed we add some other conditions and get to the unemployed. Thus, I work on the population with (empl==0).
+\item And we characterise the willingness to work under:
+\begin{itemize}
+\item	Either has used at least one active method of job search, or is currently looking for a job
+\item Or is waiting to start a job in less than 3 months
+\item	Or is temporarily away from work but will start working again in less than 3 months
+\end{itemize}
+\item And is available to start a job within 2 weeks.
+\end{enumerate}
+The exceptions made while calculating the unemployment rates are for workers who are characterized as having a job, but actually fall under category (rabs= 9 or 11), where in they are actually already laid off or are done with their job and are waiting for a new one.( I include this step in my computations).
+
+```{r, include = FALSE, warning =FALSE}
+l1<- l %>%
+  filter(ag>=15 & ag<=74)%>%
+  mutate(empl = ifelse( traref==1 & !is.na(traref==1)  ,1,
+                        ifelse( aidref==1 & tafref==2 & !is.na(aidref) & !is.na(tafref),1,
+                        ifelse( aidref==2 & natstg== 1 & !is.na(aidref) & !is.na(natstg),1,
+                        ifelse( rabs==1 & !is.na(rabs==1),1,
+                               ifelse( rabs==3 & !is.na(rabs==3),1,
+                                ifelse( rabs==4 & !is.na(rabs==4),1,
+                              ifelse( rabs==7 & !is.na(rabs==7),1,
+                              ifelse(rabs==8 & !is.na(rabs==8),1,
+                               ifelse( rabs==10 & !is.na(rabs==10),1,
+                              ifelse(rabs==2 & rabsp<=365 & !is.na(rabs==2 & rabsp<=365),1,
+                              ifelse( rabs==5 & rabsp<=91 & !is.na(rabs==5 & rabsp<=91),1,
+                            ifelse( rabs==6 & rabsp<=91 & !is.na(rabs==6 & rabsp<=91), 1 , 0 )))))))))))))
+                        
+l3<-l%>%
+  filter(ag>= 75)
+l3$empl<-ifelse(l3$temp == 1 & !is.na(l3$temp ==1) ,1,0)
+
+
+l4<-rbind(l1,l3)
+e<- lm(l4$empl~1,weight=l4$weight)
+```
+```{r, include = FALSE, warning =FALSE}
+l5<- l2 %>%
+  filter(ag>=15 & ag<=74)%>%
+  mutate(empl = ifelse( traref==1 & !is.na(traref),1,
+                ifelse( aidref==1 & tafref==2 & !is.na(aidref) & !is.na(tafref),1,
+                ifelse( aidref==2 & natstg== 1 & !is.na(aidref) & !is.na(natstg),1,
+                 ifelse( rabs==1 & !is.na(rabs),1,
+                ifelse( rabs==3 & !is.na(rabs),1,
+                ifelse( rabs==4 & !is.na(rabs),1,
+                ifelse( rabs==7 & !is.na(rabs),1,
+                ifelse(rabs==8 & !is.na(rabs),1,
+                ifelse( rabs==10 & !is.na(rabs),1,
+               ifelse(rabs==2 & rabsp<=365 & !is.na(rabs) & !is.na(rabsp),1,
+                ifelse( rabs==5 & rabsp<=91 & !is.na(rabs) & !is.na(rabsp),1,
+              ifelse( rabs==6 & rabsp<=91 & !is.na(rabs) & !is.na(rabsp), 1 , 0 )))))))))))))
+
+l6<- l2 %>%
+  filter(ag>=75) %>%
+  mutate(empl = ifelse(temp==1 & !is.na(temp==1) ,1,0))
+
+l7<-rbind(l5,l6)
+e1<- lm(l7$empl~1,weight=l7$weight)
+```
+
+```{r, include = FALSE, warning =FALSE}
+
+l4 <- l4 %>%
+  mutate(unempl = ifelse(empl==0 & ((traref==2 & dispoc==1 & (dem==1|contch==1) & pastra==2 & (!is.na(traref) & !is.na(dispoc) & !is.na(dem) & !is.na(contch) & !is.na(pastra))) | (traref==2 & dispoc==1 & (dem==1 | contch == 1) & pastra==1 & (rabs==9 | rabs == 11) & (!is.na(traref) & !is.na(dispoc) & !is.na(dem) & !is.na(contch) & !is.na(pastra) & !is.na(rabs))) | (traref==2  & (dem==1|contch==1) & dispoc==2 & nondic==6 & (!is.na(traref) &  !is.na(dem) & !is.na(contch) & !is.na(dispoc) & !is.na(nondic))) |(tafref==2 & dispoc==1 & pastrb==1 & ultj<=91 & (!is.na(tafref) & !is.na(dispoc) & !is.na(pastrb) & !is.na(ultj)))), 1, 0))
+l7 <- l7 %>%
+  mutate(unempl = ifelse(empl==0 & ((traref==2 & dispoc==1 & (dem==1|contch==1) & pastra==2 & (!is.na(traref) & !is.na(dispoc) & !is.na(dem) & !is.na(contch) & !is.na(pastra))) | (traref==2 & dispoc==1 & (dem==1 | contch == 1) & pastra==1 & (rabs==9 | rabs == 11) & (!is.na(traref) & !is.na(dispoc) & !is.na(dem) & !is.na(contch) & !is.na(pastra) & !is.na(rabs))) | (traref==2  & (dem==1|contch==1) & dispoc==2 & nondic==6 & (!is.na(traref) &  !is.na(dem) & !is.na(contch) & !is.na(dispoc) & !is.na(nondic))) |(tafref==2 & dispoc==1 & pastrb==1 & ultj<=91 & (!is.na(tafref) & !is.na(dispoc) & !is.na(pastrb) & !is.na(ultj)))), 1, 0))
+
+
+e3<-lm(l4$unempl[(l4$empl==1|l4$unempl==1)]~1, weight=l4$weight[ (l4$empl==1|l4$unempl==1)]) 
+e4<-lm(l7$unempl[(l7$empl==1|l7$unempl==1)]~1, weight=l7$weight[ (l7$empl==1|l7$unempl==1)]) 
+stargazer(e3,e4)                     
+e5<-lm(l4$unempl[(l4$empl==1|l4$unempl==1)]~1)
+e6<-lm(l7$unempl[(l7$empl==1|l7$unempl==1)]~1)
+stargazer(e5,e6)
+```
+
+\begin{table}[!htbp] \centering 
+  \caption{Official Employment and Unemployment rates for 2011 and 2012} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lcccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+\\[-1.8ex] & Employment 2011 & Unemployment 2011 & Employment 2012 & Unemployment 2012 \\ 
+\hline \\[-1.8ex] 
+ Constant & 0.513 & 0.087 & 0.511 & 0.092 \\ 
+  & (0.001) & (0.001) & (0.001) & (0.001) \\ 
+  & & & & \\ 
+\hline \\[-1.8ex] 
+Observations & 423,425 & 423,425 & 422,133 & 422,133 \\ 
+\hline 
+\hline \\[-1.8ex] 
+\end{tabular} 
+\end{table} 
+
+It should be noted that the Unemployment rates are really high, 8.7% and 9.2%, and quite close to the actual official figures for the years: 2011 and 2012. 
+The large unemployment rates in 2011-12 is partly because of the Great Financial Crisis and partly because of the cyclical fluctuations. A paper by Bruno Ducoudré (2013) explains that the NAIRU(the rate of unemployment at which the inflation rate remains stable),estimated at 7.2% on average over the years 2000-2012, increased by 0.9 percentage points since the onset of the crisis and the Inflation rose to an average 7.7% over the period 2008-2012 (while the average inflation rate over the 2000-2012 was 1.9% ). The increase in the NAIRU explains a third of the rise in the unemployment rate since 2008, with the remainder 70% coming from an increase in cyclical unemployment.
+We analyse the unemployment rates dependent on different groups of people in part (f)
+
+\textbf{Qc) Discuss this definition of unemployment and offer your own definition, by emphasizing what seems to be more relevant. If possible, compute the corresponding unemployment rate by using all the data at your disposal in the dataset. Comment.}
+
+
+In my opinion there are some inconsistencies between the definitions and a lot of times the distinctions between two concepts is not very clear:
+
+- The definition of Unemployment needs to take into account the \textbf{quality of employment}, especially because in some countries the government might fail to instate proper labour laws and we might have a lot of workers who have low bargaining power working in precarious conditions. An another way to think about this is the satisfaction from employment and whether just a semblance of paid employment should indicate the state of the labour market.
+- There is \textbf{arbitariness of time-limits} for the different types of leaves (three months for parental leave or	one year of sick leave). The policies in each country on such leaves vary as well it varies within different organisations in the country (government or private).
+- There are \textbf{inconsistencies} in recognising the underemployed which is hidden in the employed and the forced unemployed (like housewives who might want to work but are forced to remain unemployed and thus end up being in the inactive part of the population).
+- It is important to analyse \textbf{the concept of Underemployment},as which is measured in the dataset, it takes into account individuals who are employed but want to work more, or are not satisfied with current employment. The \textbf{sousempl} variable takes into account people working part-time and looking for a new job or wishing to work more, or Full-time unemployed who have involuntarily worked less. The unemployment rate indicator alone is a crude indication of the fluidity of the labour market, and this additional indicator like underemployed provide other diagnostic elements.
+- The criteria of \textbf{Ability to work} seems arbitary and the time limit given to this variable is 2 weeks, but there maybe circumstantial reasons which restrict the person from being to join wor within such a short span- maybe he is sick, or have household commitments.
+- The criteria of \textbf{Actively looking for a job} is a strong condition. There maybe people in the labour force who are discouraged by the state of affairs and have given up looking for jobs because of varied reasons(not being able to see results from job search, the costs of looking for a job-paying a job finding company). Such Non-workers who are not actively looking for a job,should still be included in the unemployed population.
+- The definition can be made \textbf{more inclusive} for different types of people- people in the prison, or the disabled, or clarity on inclusion of domestic house work and the inclusion of internships (as they are productive).
+
+For this question, I try to analyse how the above points can be included in the INSEE definition and try to make alterations with the available data.
+
+1) I make the definition more relaxed by removing the strong condition of \textbf{Actively looking for a job} given by variable _dem_.
+
+2) For the criteria of \textbf{Ability to work}, I try to include more exclusions for reasons like personal or family commitments and the need to look after children, just after pregnancy(since temporary and structural).
+
+3) Since the INSEE defines underemployment rates separately, I think it definitely helps to form the intuition behind the labour stats better to see how the underemployment figures look.
+
+
+```{r, include = FALSE, warning =FALSE}
+
+l4 <- l4 %>%
+  mutate(unempl2 = ifelse(empl==0 & ((traref==2 & dispoc==1 & pastra==2 & (!is.na(traref) & !is.na(dispoc) & !is.na(pastra))) | (traref==2 & dispoc==1 & pastra==1 & (rabs==9 | rabs == 11) & (!is.na(traref) & !is.na(dispoc) & !is.na(pastra) & !is.na(rabs))) | (traref==2  & dispoc==2 & (nondic==6|nondic==4|nondic==5|nondic==8) & (!is.na(traref)  & !is.na(dispoc) & !is.na(nondic))) |(tafref==2 & dispoc==1 & pastrb==1 & ultj<=91 & (!is.na(tafref) & !is.na(dispoc) & !is.na(pastrb) & !is.na(ultj)))), 1, 0))
+table(is.na(l4$unempl2))
+g1<-lm(l4$unempl2[(l4$empl==1|l4$unempl2==1)]~1, weight=l4$weight[ (l4$empl==1|l4$unempl2==1)])
+l7 <- l7 %>%
+  mutate(unempl2 = ifelse(empl==0 & ((traref==2 & dispoc==1 & pastra==2 & (!is.na(traref) & !is.na(dispoc) & !is.na(pastra))) | (traref==2 & dispoc==1 & pastra==1 & (rabs==9 | rabs == 11) & (!is.na(traref) & !is.na(dispoc) & !is.na(pastra) & !is.na(rabs))) | (traref==2  & dispoc==2 & (nondic==6|nondic==4|nondic==5|nondic==8) & (!is.na(traref)  & !is.na(dispoc) & !is.na(nondic))) |(tafref==2 & dispoc==1 & pastrb==1 & ultj<=91 & (!is.na(tafref) & !is.na(dispoc) & !is.na(pastrb) & !is.na(ultj)))), 1, 0))
+table(is.na(l7$unempl2))
+g2<-lm(l7$unempl2[(l7$empl==1|l7$unempl2==1)]~1, weight=l7$weight[ (l7$empl==1|l7$unempl2==1)])
+stargazer(g1,g2)
+
+```
+Using my method the Unemployment Rates have increased to 11 % for 2011, and 11.6 % for 2012. This is reasonable as I allow for more categories in the measure.
+
+\begin{table}[!htbp] \centering 
+  \caption{New unemployment rates making use of my definition} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lcc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{2}{c}{\textit{New Unemployment Rates(My definition)}} \\ 
+\cline{2-3} 
+\\[-1.8ex] & 2011 & 2012 \\ 
+\hline \\[-1.8ex] 
+ Constant & 0.110 & 0.116 \\ 
+  & (0.001) & (0.001) \\ 
+  & & \\ 
+\hline \\[-1.8ex] 
+Observations & 232,567 & 232,091 \\
+\hline 
+\hline \\[-1.8ex]
+\end{tabular} 
+\end{table} 
+
+```{r, include = FALSE, warning =FALSE}
+l11 <- l4 %>%
+  mutate(noi_c = as.character(noi)) %>%
+  mutate(ID = paste(ident, noi_c)) %>%
+  group_by(ID) %>%
+  filter(trim ==1 |trim == 2 |trim == 3) %>%
+  filter(length(trim) >= 3) %>%
+  mutate(labstat = ifelse(unempl ==1, 1, ifelse(empl ==1,2,
+                              0)))
+l12 <- l7 %>%
+  mutate(noi_c = as.character(noi)) %>%
+  mutate(ID = paste(ident, noi_c)) %>%
+  group_by(ID) %>%
+  filter(trim ==1 |trim == 2 |trim == 3) %>%
+  filter(length(trim) >= 3) %>%
+  mutate(labstat = ifelse(unempl ==1, 1, ifelse(empl ==1,2,
+                              0)))
+table(is.na(l4$empl))
+#subset by quarter
+l11q1 <- l11 %>%
+  filter(trim ==1) %>%
+  select(laborstatus11q1 = labstat, ID)
+
+l11q2 <- l11 %>%
+  filter(trim ==2) %>%
+  select(laborstatus11q2 =labstat, ID)
+
+l11q3 <- l11 %>%
+  filter(trim ==3) %>%
+  select(laborstatus11q3=labstat, ID)
+
+l12q1 <- l12 %>%
+  filter(trim ==1) %>%
+  select(laborstatus12q1 = labstat, ID)
+
+l12q2 <- l12 %>%
+  filter(trim ==2) %>%
+  select(laborstatus12q2 = labstat, ID)
+
+crosstab(l11q1$laborstatus11q1,l11q2$laborstatus11q2,digits=2, prop.r=TRUE, na.rm= TRUE)
+crosstab(l11q2$laborstatus11q2,l11q3$laborstatus11q3,digits=2, prop.r=TRUE, na.rm= TRUE)
+crosstab(l12q1$laborstatus12q1,l12q2$laborstatus12q2,digits=2, prop.r=TRUE, na.rm= TRUE)
+```
+
+
+
+
+\textbf{Qd)What is the standard error of the estimated unemployment rate (computed in question b)?Comment.}
+
+I have run a unweighted regression of the unemployment dummy for the labour force, and from the summary statistics we get the standard error of our estimates. Manually, we can compute the 95% confidence interval for this estimate of unemployment rate.
+Standard errors provide us a tool to judge the quality of an estimate to ensure that it is within an acceptable range for their intended purpose. Collected and imputed data are included in the standard error calculation.
+
+The unemployment estimates are derived from a sample and thus, are subject to sampling errors. Sampling errors are differences that occur between the results computed from a sample of observations and those computed from all observations in a population. The estimates derived from different samples selected using the same sample design may differ from each other.
+The standard error is a measure of the variation among these differing estimates. It can be used to measure the precision with which an estimate from a particular sample approximates the expected result of all possible samples. Standard errors can be used to define a range or level of confidence (confidence interval) around an estimate.
+
+For instance, the 95 percent confidence level means that if all possible samples were selected and an estimate of a value and its sampling error were computed for each, then for approximately 95 percent of the samples, the intervals from 1.96 times estimated standard errors below the estimate to 1.96 times the estimated standard errors above the estimate would include the "true" population figure.(In the following example, out of 100 samples, 95 times we will have the estimated unemployment rate between 0.086 and 0.088 for 2011 )
+Thus we can calculate the 95% confidence interval for unemployment rate as :
+\[Confidence Interval = Estimated Unemployment Rate +/- (1.96* estimated standard error)\]
+
+For the Year 2011,we have
+\[Estimated Unemployement Rate= 0.087\]
+\[Estimated Std.error= 0.0006\]
+\[Confidence interval= 0.087 +/- (1.96 *0.0006)= (0.086, 0.088)\]
+
+Similarly, for the Year 2012,we have
+\[Estimated Unemployement Rate= 0.091\]
+\[Estimated Std.error= 0.0006\]
+\[Confidence interval= 0.091 +/- (1.96 *0.0006)= (0.09, 0.092)\]
+
+
+A necessary prerequisite to sensibly interpreting fluctuations in the measured unemployment rate is an awareness of the range of uncertainty surrounding the estimated monthly rate.
+The process of calculating unemployment rates is likely to give rise to significant error from three sources: response error, sampling error, and seasonal adjustment error. Each employment measuring document contains an extensive discussion of the errors that may be expected due to sampling variability,but though they provide estimates based on alternative techniques for seasonal adjustment, no quantitative measures are provided for the uncertainties associated with the seasonal adjustment process or for the errors arising from various types of response bias. This omission is likely to be of particular importance in assessing the statistical significance of reported month-to-month changes in the unemployment rate.
+
+The major source of uncertainty in interpreting monthly movements in the unemployment rate arises from the problem of seasonal adjustment.
+ First, at the time the unemployment rate is announced, only past data are available to estimate the seasonal structure. The data is thus subject to revision as later data become available. 
+ 
+Second, no one knows the appropriate model of seasonality to apply in adjusting the data. The continuing controversy between advocates of additive and of multiplicative seasonal adjustment illustrates this problem. 
+
+Third, even assuming the validity of a particular model of seasonality, with only a finite amount of data there will be statistical error.
+
+( Note: If we include weights, a way to find for these confidence intervals in a weighted sample is by using bootstrap, where in a large number of samples are constructed from the original sample and the standard deviation of this new bootstrap distribution is the standard error.)
+
+
+
+
+```{r, echo= FALSE, warning =FALSE}
+t<-lm(l4$unempl[l4$unempl==1|l4$empl==1]~1)
+t1<-lm(l7$unempl[l7$unempl==1|l7$empl==1]~1)
+ap<-data.frame(
+  Year=c("2011","2012"),
+  Estimated_Unemployment_Rates =c("0.087","0.091"),
+  Standard_Error=c("0.0006","0.0006"),
+  Confidence_Interval=c("0.086-0.088","0.09-0.092")
+)
+kable(ap,
+      caption="Stats about the Estimated Unemployment Rate",
+      align = c("c","c"))
+```
+
+
+
+
+\textbf{Qe)Analyze and comment on the evolution of the structure of the working-age population in terms of work status (employment, unemployment, inactivity):}
+I depict here the Transition Matrices for the three comparisons asked.
+```{r, echo= FALSE, warning =FALSE}
+s <- matrix(c("96.32% ","1.38%","2.30%","17.94%" , "64.74%","17.31%" ,"1.89%", "1.06%" ,"97.05%"),ncol=3,byrow=TRUE)
+colnames(s) <- c("Inactive","Unemployed","Employed")
+rownames(s) <- c("Inactive","Unemployed","Employed")
+names(dimnames(s)) <- c("Quarter 1", "Quarter 2")
+s <- as.table(s)
+kable(s,
+      caption = "Transition Matrix between 2011 Quarter 1(row) and Quarter 2(column)",
+      align=c("c","c","c"))
+
+s1 <- matrix(c("95.38%"	,"1.64%",	"2.98%",
+"18.79%",	"62.63%",	"18.59%", "2.65%","1.42%",	"95.93%"),ncol=3,byrow=TRUE)
+colnames(s1) <- c("Inactive","Unemployed","Employed")
+rownames(s1) <- c("Inactive","Unemployed","Employed")
+names(dimnames(s1)) <- c("Quarter 2", "Quarter 3")
+s1 <- as.table(s1)
+kable(s1,
+      caption = "Transition Matrix between 2011 Quarter 2(row) and Quarter 3(column)",
+      align=c("c","c","c"))
+
+s2 <- matrix(c("96.35%",	"1.57%",	"2.08%",
+"17.89%",	"65.63%",	"16.48%",
+"1.96%",	"1.03%",	"97.01%"
+),ncol=3,byrow=TRUE)
+colnames(s2) <- c("Inactive","Unemployed","Employed")
+rownames(s2) <- c("Inactive","Unemployed","Employed")
+names(dimnames(s2)) <- c("Quarter 1", "Quarter 2")
+s2 <- as.table(s2)
+kable(s2,
+      caption = "Transition Matrix between 2012 Quarter 1(row) and Quarter 2(column)",
+      align=c("c","c","c"))
+
+```
+A transition matrix consists of a square matrix that gives the probabilities of different states going from one to another. Thus the diagonal of the matrix represents the percentage of population whose state does not change between the two time periods under consideration. The following trends about evolution can be explained using the matrices described:
+
+- For all the time periods under comparison high percentages of those who were inactive or employed( more than 90%) stay in the same state, but only about 60% of those who were unemployed stay unemployed in the next period. There is greater percentage of the flow of the unemployed into either becoming inactive or becoming employed.
+
+- From the unemployed, the proportion of change to employed or inactive is really close. The unemployed becoming employed is a good trend, but the high proportions of shift towards inactivity points at the "discouragement impact" of the market. When people are disillusioned about getting a job, they leave the search for a job( falling into category of not actively seeing employment), and become inactive. Another reason of increase in inactivity could be because of unemployment compensation or other welfare schemes provided by the Government.
+
+- A proportion of close 2%(for most of the comparisons) of the Employed in this period, become inactive in the next period, which is a severely absurd condition.
+
+In general, the unemployment rates define the stock conept of the labour market at a particular time. The flow concepts help us in analysing the evolution and the flexibility of the labour markets and hint at whether or not policies to generate employment is actually being fruitful. These trends also helps in analysing what the next move of the government should be, and which groups in the population must be priortised.
+
+
+
+
+
+
+
+\textbf{Qf) Using the official definition of unemployment rate and labor force participation, comment on the differences that you are able to observe for this rate in 2012 by gender, age and highest qualification held.}
+
+```{r, include = FALSE, warning =FALSE}
+l7$lf<- ifelse(l7$empl==1 | l7$unempl==1, 1, 0)
+m <- lm(l7$lf[l7$sexe==1]~1, weight=l7$weight[l7$sexe==1])
+f <- lm(l7$lf[l7$sexe==2]~1, weight=l7$weight[l7$sexe==2])
+stargazer(m,f)
+m1<-lm(l7$unempl[l7$sexe==1 & l7$lf==1]~1, weight=l7$weight[l7$sexe==1 & l7$lf==1])
+f1<-lm(l7$unempl[l7$sexe==2 & l7$lf==1]~1, weight=l7$weight[l7$sexe==2 & l7$lf==1])
+stargazer(m1,f1)
+
+### Age
+
+o <- lm(l7$unempl[l7$ag >= 50 & l7$lf==1]~1, weight=l7$weight[l7$ag >= 50 & l7$lf==1])
+o1<-lm(l7$lf[l7$ag >= 50]~1, weight=l7$weight[l7$ag >= 50])
+y <- lm(l7$unempl[l7$ag<=24 & l7$lf==1]~1, weight=l7$weight[l7$ag<=24 & l7$lf==1])
+y1<-lm(l7$lf[l7$ag<=24]~1, weight=l7$weight[l7$ag<=24])
+m3 <- lm(l7$unempl[l7$ag<=49 & l7$ag>=25 & l7$lf==1]~1, weight=l7$weight[l7$ag<=49 & l7$ag>=25 & l7$lf==1])
+m4<- lm(l7$lf[l7$ag<=49 & l7$ag>=25]~1, weight=l7$weight[l7$ag<=49 & l7$ag>=25])
+stargazer(o,y,m3)
+stargazer(o1,y1,m4)
+
+### Education
+
+
+h <- lm(l7$lf[l7$ddipl==1]~1, weight=l7$weight[l7$ddipl==1])
+b<-lm(l7$lf[l7$ddipl==3]~1, weight=l7$weight[l7$ddipl==3])
+bc<-lm(l7$lf[l7$ddipl==4]~1, weight=l7$weight[l7$ddipl==4])
+L <- lm(l7$lf[l7$ddipl==7]~1, weight=l7$weight[l7$ddipl==7])
+x<-lm(l7$lf[l7$ddipl==5]~1, weight=l7$weight[l7$ddipl==5])
+h1 <- lm(l7$unempl[l7$ddipl==1& l7$lf==1]~1, weight=l7$weight[l7$ddipl==1& l7$lf==1]) 
+b1 <- lm(l7$unempl[l7$ddipl==3& l7$lf==1]~1, weight=l7$weight[l7$ddipl==3& l7$lf==1])
+bc1 <- lm(l7$unempl[l7$ddipl==4& l7$lf==1]~1, weight=l7$weight[l7$ddipl==4& l7$lf==1])
+L1 <- lm(l7$unempl[l7$ddipl==7& l7$lf==1]~1, weight=l7$weight[l7$ddipl==7& l7$lf==1])
+x1<-lm(l7$unempl[l7$ddipl==5& l7$lf==1]~1, weight=l7$weight[l7$ddipl==5 & l7$lf==1])
+stargazer(h,b,bc,L,x)
+stargazer(h1,b1,bc1,L1,x1)
+```
+\begin{table}[!htbp] \centering 
+  \caption{LFP rates among the Males and Females in 2012} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lcc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{2}{c}{\textit{Labour Force Participation Rate}} \\ 
+\cline{2-3} 
+\\[-1.8ex] & Male & Female \\ 
+\hline \\[-1.8ex] 
+ Constant & 0.616& 0.516 \\ 
+  & (0.001) & (0.001) \\ 
+  & & \\ 
+\hline \\[-1.8ex] 
+Observations & 200,043 & 222,090 \\ 
+\hline 
+\hline \\[-1.8ex] 
+\end{tabular} 
+\end{table}
+
+\begin{table}[!htbp] \centering 
+  \caption{Unemployment Rates among the Males and Females in 2012} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lcc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{2}{c}{\textit{Unemployment Rates}} \\ 
+\cline{2-3} 
+\\[-1.8ex] & Male & Female \\ 
+\hline \\[-1.8ex] 
+ Constant & 0.092 & 0.093 \\ 
+  & (0.001) & (0.001) \\ 
+  & & \\ 
+\hline \\[-1.8ex] 
+Observations & 116,852 & 109,360 \\ 
+\hline 
+\hline \\[-1.8ex] 
+\end{tabular} 
+\end{table}
+
+\begin{table}[!htbp] \centering 
+  \caption{Unemployment Rates among the different age groups in 2012} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{3}{c}{\textit{Unemployment Rates}} \\ 
+\cline{2-4} 
+\\[-1.8ex] & Old(>50yrs) & Young(<25yrs) & Middle-aged \\ 
+\hline \\[-1.8ex] 
+ Constant & 0.067 & 0.227 & 0.086 \\ 
+  & (0.001) & (0.003) & (0.001) \\ 
+  & & & \\ 
+\hline \\[-1.8ex] 
+Observations & 68,631 & 19,651 & 137,930 \\ 
+\hline 
+\hline \\[-1.8ex] 
+\end{tabular} 
+\end{table}
+
+\begin{table}[!htbp] \centering 
+  \caption{LFP rates among the different age groups in 2012} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{3}{c}{\textit{Labour Force Participation Rate}} \\ 
+\cline{2-4} 
+\\[-1.8ex] & Old(>50yrs) & Young(<25yrs) & Middle-aged  \\ 
+\hline \\[-1.8ex] 
+ Constant & 0.348 & 0.349 & 0.883 \\ 
+  & (0.001) & (0.002) & (0.001) \\ 
+  & & & \\ 
+\hline \\[-1.8ex] 
+Observations & 205,896 & 59,176 & 157,061 \\ 
+\hline 
+\hline \\[-1.8ex] 
+\end{tabular} 
+\end{table} 
+
+\begin{table}[!htbp] \centering 
+  \caption{LFP rates among the different educational qualification groups in 2012} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lcccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{4}{c}{\textit{Labour Force Participation Rate}} \\ 
+\cline{2-5} 
+\\[-1.8ex] & Master's Degree & Bachelor's Degree & Baccalauréat & No qualification/Primary school \\ 
+\hline \\[-1.8ex] 
+ Constant & 0.779 & 0.799 & 0.616 & 0.330 \\ 
+  & (0.002) & (0.002) & (0.002) & (0.001) \\ 
+  & & & & \\ 
+\hline \\[-1.8ex] 
+Observations & 53,673 & 41,305 & 72,473 & 119,949 \\
+\hline 
+\hline \\[-1.8ex]
+\end{tabular} 
+\end{table}
+
+\begin{table}[!htbp] \centering 
+  \caption{Unemployment Rates among the different educational qualification groups in 2012} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lcccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{4}{c}{\textit{Unemployment Rates}} \\ 
+\cline{2-5} 
+\\[-1.8ex] & Master's Degree & Bachelor's Degree & Baccalauréat & No qualification/Primary school \\ 
+\hline \\[-1.8ex] 
+ Constant & 0.049 & 0.051 & 0.090 & 0.170 \\ 
+  & (0.001) & (0.001) & (0.001) & (0.002) \\ 
+  & & & & \\ 
+\hline \\[-1.8ex] 
+Observations & 40,871 & 32,203 & 43,187 & 36,955 \\
+\hline 
+\hline \\[-1.8ex]
+\end{tabular} 
+\end{table}
+
+I draw the following conclusions from the analysis of the tables:
+
+- From Table- 6, it is evident that the Labour Force participation between males and females differ by 10 percentage points, while the unemployment rates are more or less same across the genders. This in compliance with theory which states that the labour force partiicipation is lower for females than for males because of the traditional gender roles of females staying back at home and taking care of the kids or doing household work.
+
+- From Table- 8, the unemployment rates is the highest for the young(close to 222.7%), and the Labour Force participation amongst the middle aged is the highest. A plausible reason for the low labour force participation among the young, could be that they are not yet completed their studies and thus have not entered formal employment. ALso, those who want to get into the market, are not accepted in because the young lacks experience and the required skill.
+
+- Labour force Participation rates for those with a master's or bachelor's degree is same and higher than among those who have just done high school. The high unemployment rates for those who have done just highschool points at the fact that the market offers employbility for those who have higher education. The unemployment is high for those with no education and the markets do not have enough jobs for the less- skilled.
+
+- The Labour Force participation rate for the old is less which is the natural response to the fact that the French system does not encourage and even discourages work in this age bracket.These disincentives were intentional: the evolution of pension rules that occurred since Social Security  in 1946, and in particular the implementation of retirement at age 60 in 1983 was explicitly aimed at organizing massive exits from the labour force at this age which, at that time, was considered as the normal age at retirement collectively favored by public opinion. 
+
+- The unemployment Rates for the young and for those with vocational training is high since in France, young people’s access to apprenticeships is slightly below the OECD average, and vocational pathways are not, in their current form, sufficiently prized on the labour market.
+
+# We have to exclude all NAs (regarding test 1 and test 2 scores);
+# in order to be able to calculate the probabilities
+# below, we need values for the individual's decile for both tests!
+# (Otherwise we cannot say "an individual who was in decile 1 for test
+# 1, was in decile X in test 2" if there is no value for decile X)
+
+for(i in 1:10){
+  for(j in 1:10){
+    tr1_2[i,j] <- sum(ln$d_gscore_t1 == i & ln$d_gscore_t2 == j)/nrow(ln)
+  }
+}
+tr1_2 <- data.frame(tr1_2)
+
+#make the matrix clearer
+
+tr1_2_cl <-  tr1_2*100
+tr1_2_cl <-  round(tr1_2_cl, digits=3)
+View(tr1_2_cl)

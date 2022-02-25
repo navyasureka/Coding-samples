@@ -1,0 +1,1127 @@
+---
+title: "Measurement HW-6"
+author: "Navya Sureka"
+date: "28/11/2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r, include = FALSE, warning =FALSE}
+list.of.packages <- c("tidyverse", "haven", "knitr","broom","stargazer","readstata13","descr","xtable")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages, repos = "http://cran.us.r-project.org")
+invisible(lapply(list.of.packages, library, character.only = TRUE))
+l<- read_dta("panel97.dta")
+p<- read_dta("pisa_2012.dta")
+```
+\subsection{1)a) DISTRIBUTION OF SCORES}
+The following tables-1,2 and 3 gives information about the summary statistics for the global score as well as the scores in math and reading for the three tests conducted. It can be stated that:
+
+* The Standard deviations increase across the tests.
+
+* The proportion of missing Values increase across the tests.
+
+
+The graphs shown in this exercise depict the distributions for the global raw scores for each test as well as the literacy and numeracy scores. We can observe the following:
+
+* All are negatively skewed, such that the majority of the students are below the mean.
+
+* The global raw scores at the entry exam is the closest to normality except for some outliers lying to the left of the mean.
+
+* The numeracy exam is the most negatively skewed comparatively.
+
+* The third exam for both numeracy and literacy has a larger number of observations in the left tail, pointing at comparatively lower scores.
+
+* For both second and third exams, the global scores distribution is more normally distributed than the individual numeracy and literacy distributions. The global scores are an average between the math and the literacy scores and thus averaging out reduces the variance.
+
+
+Although these are useful comparisons, it may prove hard to infer much from these distributions, without having more information about the relative composition variation of the classes or the difficulty of the tests. To make better comparisons we need to use standardised scores( as done later in the assignment).
+Also, it is important to understand how commenting on the change in mean scores through the years will be wrong, since we are not concerning the same population in all the three tests. At each test we see different numbers of missing values which increases over time. Also, since means are sensitive to the outliers, it is better to work median or more comprehensive scores like the standardised scores.
+
+
+```{r, echo = FALSE, warning =FALSE}
+
+a<-data.frame(
+Test=c("1","2","3"),
+Mean=c("68.995", "66.87","65.714"),
+Standard_Deviation=c("12.90","14.65","16.26"),
+Number_of_missing_values=c("110","1978","2163"),
+Proportion_of_missing_values=c("1.1%","20.51%","22.43%")
+)
+a1<-data.frame(
+Test=c("2","3"),
+Mean=c( "66.04","65.03"),
+Standard_Deviation=c("15.43","19.31"),
+Number_of_missing_values=c("1921","2067"),
+Proportion_of_missing_values=c("19.92%","21.44%")
+)
+
+a2<-data.frame(
+Test=c("2","3"),
+Mean=c( "67.63","66.36"),
+Standard_Deviation=c("15.69","15.61"),
+Number_of_missing_values=c("1913","2104"),
+Proportion_of_missing_values=c("19.84%","21.82%")
+)
+kable(a,
+      caption = "Summary for the Raw Global Scores over the years",
+      align=c("c","c","c","c","c"))
+kable(a1,
+      caption = "Summary for the Raw Math Scores over the years",
+      align=c("c","c","c","c","c"))
+kable(a2,
+      caption = "Summary for the Raw Literacy Scores over the years",
+      align=c("c","c","c","c","c"))
+
+```
+```{r, echo=FALSE,  warning =FALSE, fig.height=3.5}
+ggplot(l) +
+
+ggtitle("Density of Scores in Test 1, 2 and 3")+
+
+geom_density(aes(x= gscore_t1, col='a')) +
+
+geom_density(aes(x= gscore_t2, col='b')) +
+
+geom_density(aes(x= gscore_t3, col='c')) +
+
+scale_colour_manual(name ="",
+values =c('a'="indianred",'b'="forestgreen", 'c'="navyblue"),
+labels = c('Test 1','Test 2', 'Test 3')) +
+ylab("Density")+ xlab("Score") + 
+theme(axis.line = element_line(colour = "black"),
+panel.border = element_blank(),
+panel.background = element_blank())
+
+ggplot(l) +
+  
+  ggtitle("Distribution of Scores in Math, Test 2 & 3")+
+  
+  geom_density(aes(x= mscore_t2, col='a')) +
+  
+  geom_density(aes(x= mscore_t3, col='b')) +
+
+  
+  scale_colour_manual(name ="",
+                      values =c('a'="navyblue",'b'="red"),
+                      labels = c('Test 2','Test 3')) + 
+  ylab("Density")+ xlab("Score") + 
+  theme(axis.line = element_line(colour = "black"),
+        panel.border = element_blank(),
+        panel.background = element_blank())
+
+ggplot(l) +
+  
+  ggtitle("Distribution of Scores in Reading, Test 2 & 3")+
+  
+  geom_density(aes(x= fscore_t2, col='a')) +
+  
+  geom_density(aes(x= fscore_t3, col='b')) +
+  
+  
+  scale_colour_manual(name ="",
+                      values =c('a'="navyblue",'b'="red"),
+                      labels = c('Test 2','Test 3')) + 
+  ylab("Density")+ xlab("Score") + 
+  theme(axis.line = element_line(colour = "black"),
+        panel.border = element_blank(),
+        panel.background = element_blank())
+
+
+```
+
+\subsection{b) MISSING VALUES}
+In the summary tables- 1,2 and 3, we see that the total missing values for each score and the proportion of the missing values. The number and proportion of missing values increase across the tests.
+An important point to think here is whether we can actually state if the values go missing at random or not. If the missing values have a trend, then it is a problem as it makes our estimates biased. 
+According to the following analysis, the missing values seems to have a trend, and thus their presence makes our estimates biased.
+
+* I compare the mean scores for test 1 for all students to the mean scores in Test 1  for students who gave all of the three tests or atleast one of the other tests.I find that the differences are significant and rather the mean scores for all students in test 1 is lower than the mean scores of those students who take all the tests or atleast 2 tests. This is a hint towards a relation that values go missing if in the previous test, the student scores lower. 
+
+* In a way the Table- , shows that the proportion of missing in the Test-2, who were in the lower deciles in the test 1, actually are very high. This points at the fact that the grades of students who were previously performing worse are actually now missing in the new test. These missing values bias our estimates and comparisons between tests.
+
+* Another plausible reason for going missing could be connected to some demographic trait for the student which again is important to feature in our estimations.
+
+* Calculation of Progress becomes difficult since also we are not keeping the same observations across the tests, thus later, I use the data for the students who gave all the three tests to comment on their progress.
+```{r,echo=F}
+z<-tidy(t.test(l$gscore_t1, l$gscore_t1[!is.na(l$gscore_t2) & !is.na(l$gscore_t3)]))
+z1<-tidy(t.test(l$gscore_t1, l$gscore_t1[!is.na(l$gscore_t2) | !is.na(l$gscore_t3)]))
+```
+
+\begin{table}[ht]
+\centering
+\caption{Checks to Find out what the missing values are}
+\begin{tabular}{cccc}
+  \hline
+Checks & Difference & estimate1 & estimate2 \\ 
+  \hline
+1 & -1.56$^{***}$ & 69.00 & 70.56  \\
+2 & -0.71$^{***}$ & 69.00 & 69.70   \\ 
+   \hline
+   \hline
+\hline \\[-1.8ex] 
+\textit{Note:}  & \multicolumn{1}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\
+\end{tabular}
+\end{table}
+
+\subsection{c) PLOT OF GLOBAL SCORES}
+The plot does not tell us much, but just a positive correlation, about the global scores in test2 being higher if it was higher in test 1.
+It does not tell us about the variance or the distribution of the scores. 
+To make it more meaningful, I plot the error bars, instead of the point the second time to comment more on the spread of the distribution and also add a regression line.
+It would be better to compare the evolution of relative scores rather as I do later.
+
+
+```{r, echo= FALSE, warning =FALSE, fig.height=3}
+ggplot(l) +
+(aes(x=gscore_t1, y=gscore_t2, ,ymin =gscore_t2 -sd(gscore_t2), ymax = gscore_t2 +sd(gscore_t2))) +
+xlim(0, 100) +
+geom_point(colour="forestgreen", size = 0.1) +
+geom_abline(slope=1, intercept=0, colour="navyblue", size=1) +
+ylab("Score Test 2") +
+xlab("Score Test 1") +
+ggtitle("Scores of Test 1 and Test 2")+
+  
+theme(axis.line = element_line( colour = "black"),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+
+ggplot(l) +
+(aes(x=gscore_t1, y=gscore_t2, ,ymin =gscore_t2 -sd(gscore_t2), ymax = gscore_t2 +sd(gscore_t2))) +
+xlim(0, 100) +
+geom_abline(slope=1, intercept=0, colour="navyblue", size=1) +
+  geom_line(aes(group = 1)) + 
+  geom_errorbar(width = 0.2)   +
+ylab("Score Test 2") +
+xlab("Score Test 1") +
+ggtitle("Scores of Test 1 and Test 2")+
+  
+theme(axis.line = element_line( colour = "black"),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+l<-l%>%
+  mutate(z_1= (gscore_t1- 68.995)/12.90) %>%
+  mutate(z_2= (l$gscore_t2- 66.87)/14.65) %>%
+  mutate(z_3= (l$gscore_t3- 65.714)/16.26) %>%
+  mutate(diff= z_1-z_2)%>%
+  mutate(diff2=z_2-z_3)
+new<-l%>%
+  filter(!is.na(gscore_t1) & !is.na(gscore_t2) & !is.na(gscore_t3))%>%
+  mutate(z_1= (gscore_t1- mean(gscore_t1))/sd(gscore_t1)) %>%
+  mutate(z_2= (gscore_t2- mean(gscore_t2) )/sd(gscore_t2)) %>%
+  mutate(z_3= (gscore_t3- mean(gscore_t3))/sd(gscore_t3)) %>%
+  mutate(ndiff= z_2-z_1)%>%
+  mutate(ndiff2=z_3-z_2)
+
+
+```
+
+
+\subsection{c) Measuring Progress}
+I propose the following ways to measure the progress:
+* First, I make a new dataset by filtering for the values that are present in all the three tests.This is an important step  because the missing values in the tests are increasing in proportion and maybe related to demographic traits or the scores in the previous tests.I want to compare progress within the same observations and not bias my estimations because of the presence  of missing values.There are 6351 observations in the new dataset.
+* To measure progress, I use standardised scores whcich are calculated as : 
+
+\[StandardisedScore= \frac{Score_{i}-Mean(Scores_{i})} {StandardDeviation(Scores_{i})}\]
+
+The implications of standardising is important, we do not know what are the difficulty levels across the tests, this matters, because the performance of a student with relation to the performance of other students tells us about how well/badly the student performs relative to his class. Thus, scoring a 10 on 20 could be good on a test if the average score is 8 in a class, but can be bad if the average is 15 in the class. Thus, the standardised scores tells us how far away the student is relative to the average performance in the class.
+
+After making these modifications, we need to see how to compare the z-scores across the tests. I use a method of calculating the difference in the z-scores. For progress, this difference is 0 between test 1 and 2 as well as between test 2 and 3. On an average there is no change in the distribution of the standardised scores, as shown in the graphs. The standardised scores also have negative skewness, but with reduced variance.
+The plots for the difference in the z scores between the tests seem to be quite close to normal.
+
+```{r, echo=FALSE, warning =FALSE, fig.height=3.5}
+vl<-data.frame(
+  Test=c("1&2", "2 &3"),
+  Mean= c(mean(new$ndiff),mean(new$ndiff2))
+)
+kable(vl,
+      caption="Mean of the Differences in z-scores",
+      align=c("c","c"))
+
+ggplot(new) +
+
+ggtitle("Density of Standardised Scores in Test 1, 2 and 3")+
+
+geom_density(aes(x= z_1, col='a')) +
+
+geom_density(aes(x= z_2, col='b')) +
+
+geom_density(aes(x= z_3, col='c')) +
+
+scale_colour_manual(name ="",
+values =c('a'="indianred",'b'="forestgreen", 'c'="navyblue"),
+labels = c('Test 1','Test 2', 'Test 3')) +
+ylab("Density")+ xlab("Score") + 
+theme(axis.line = element_line(colour = "black"),
+panel.border = element_blank(),
+panel.background = element_blank())
+
+ggplot(new) +
+
+ggtitle("Density of Difference in Standardised Scores in Test 1 & 2, 2 & 3")+
+
+geom_density(aes(x= ndiff, col='a')) +
+
+geom_density(aes(x= ndiff2, col='b')) +
+
+
+scale_colour_manual(name ="",
+values =c('a'="indianred",'b'="forestgreen"),
+labels = c('Test 1 & 2','Test 2 & 3')) +
+ylab("Density")+ xlab("Difference in Z Scores") + 
+theme(axis.line = element_line(colour = "black"),
+panel.border = element_blank(),
+panel.background = element_blank())
+l17<-l%>%
+  mutate(d_gscore_t1=ifelse(is.na(d_gscore_t1),11,d_gscore_t1))%>%
+  mutate(d_gscore_t2=ifelse(is.na(d_gscore_t2),11,d_gscore_t2))%>%
+  mutate(d_gscore_t3=ifelse(is.na(d_gscore_t3),11,d_gscore_t3))
+```
+
+\subsection{d) Deciles and Transition Matrices}
+It is also important to know about the mobility between the deciles, in a way that what proportion of low decile scores move to a higher decile. This type of interpretation can help us find out the progress among the deciles, it also helps us in knowing what proportion of observations remain sticky in the lower deciles and can help us understand which students need more focus in terms of them moving ahead.
+I use two ways of addressing the mobility:
+
+* I drop the missing values and compare the mobility of the same observations between the two tests.
+
+* I convert the NAs to 11, and create another column represnting mobility between NAs between the two tests another comparisons.
+
+
+The following observations can be made:
+
+* The diagonals for a transition matrix shows the proportion of observations which dont switch places between the two tests. The proportions at the extreme deciles ( 1st and 2nd and 9th and 10th deciles) is the highest. There is little mobility at these deciles compared to the other deciles. This intuitively makes sense that moving from the extreme ends require some change push, in essence among the non-performers( lower deciles), there is a lack of motivation to improve or these student might just not be interested to make efforts in studies, similarly, those at the higher deciles are the ones who are highly focused and consistent with their work and thus always remain the top deciles.
+There is more mobility in the middle 60% of the distribution whose performance is dependent on the nature and difficulty of the tests.
+The proportions to move either way( to a higher or a lower decile) in the middle of the  distribution is more or less equal.
+
+* Coming on the transition Matrix with the NA distribution we can comment on several important points.
+Between Test 1 and Test 2, close to 48% of the 1st decile in Test 1, become NAs in Test-2,and around 31% of the Decile 2 in Test 1 become NAs in Test-2 and these proportions are stark and points at a systematic trend for lower deciles in the previous test to become NAs in the subsequent test. It should be noted as well that the missing values increases by almost 1800 between Test 1 and 2. And these proportions of missing from the lower deciles severely skew our estimates for any measurement of progress, if the missing values are not treated.
+Between Test 2 and Test 3, the number of missing values in total increases by around 200, and from the table, we can see that the close to 47% missing values in Test 2 are also missing values in Test 3. Thus the trend that starts in Test 1, follows later and this should be dealt with caution.
+If most of our missing values in this test were lower values in the previous test, then our estimates for this test is likely to be overestimated. Another point to note is that from the distribution graphs in Q-1, we can say that the observations at the lower tail increases across the tests, and this is a case where we dont account for the missing, which are more likely to be low scores too. Thus, this is an alarm as to dealing with these missing in some way to remove the biasness in our estimates and the interpretations.
+
+
+ 
+ 
+```{r, include=F, warning =FALSE, fig.height=3.5}
+ln <- subset(l, !is.na(l$d_gscore_t1) & !is.na(l$d_gscore_t2))
+ln1<- subset(l, !is.na(l$d_gscore_t2) & !is.na(l$d_gscore_t3))
+
+k<-crosstab(ln$d_gscore_t1,ln$d_gscore_t2, xlab="Deciles Test 1", ylab = "Deciles Test 2", prop.r=T)[2]
+k<- data.frame(k)
+k1 <- matrix(k[,3], nrow=10)
+k1 <- data.frame(k1)
+k2 <- k1*100
+
+t<-crosstab(ln1$d_gscore_t2,ln1$d_gscore_t3, xlab="Deciles Test 2", ylab = "Deciles Test 3", prop.r=T)[2]
+t<- data.frame(t)
+t1 <- matrix(t[,3], nrow=10)
+t1 <- data.frame(t1)
+t2 <- t1*100
+
+kl<-crosstab(l17$d_gscore_t2,l17$d_gscore_t3, xlab="Deciles Test 2", ylab = "Deciles Test 3", prop.r=T)[2]
+kl<- data.frame(kl)
+kl1 <- matrix(kl[,3], nrow=11)
+kl1 <- data.frame(kl1)
+kl2 <- kl1*100
+
+km<-crosstab(l17$d_gscore_t1,l17$d_gscore_t2, xlab="Deciles Test 1", ylab = "Deciles Test 2", prop.r=T)[2]
+km<- data.frame(km)
+km1 <- matrix(km[,3], nrow=11, ncol=11)
+km1 <- data.frame(km1)
+km2 <- km1*100
+```
+\begin{table}[ht]
+\centering
+\caption{Transition matrices across deciles of the global score distribution between test 1 and test
+2} 
+\begin{tabular}{rrrrrrrrrrrr}
+\hline
+& & & & & & Test-2\\
+  \hline
+Test1 & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 & 9 & 10 & Total \\ 
+  \hline
+1 & 44.3 & 19.8 & 14.8 & 7.4 & 5.2 & 3.5 & 2.9 & 0.6 & 1.2 & 0.2 & 485\\ 
+  2 & 31.7 & 22.8 & 15.5 & 11.1 & 7.5 & 5.0 & 3.7 & 1.5 & 1.2 & 0.1 & 684 \\ 
+  3 & 17.8 & 19.7 & 15.4 & 16.8 & 10.8 & 7.8 & 6.2 & 3.2 & 2.0 & 0.3 & 714 \\ 
+  4 & 10.6 & 15.0 & 18.0 & 17.0 & 12.3 & 10.2 & 8.2 & 4.7 & 3.0 & 1.0 & 794 \\ 
+  5 & 7.3 & 11.7 & 14.1 & 13.7 & 13.6 & 13.1 & 11.3 & 8.7 & 4.5 & 2.0 & 831\\ 
+  6 & 3.1 & 8.5 & 11.0 & 12.6 & 14.8 & 14.9 & 12.9 & 10.0 & 8.0 & 4.2 & 738\\ 
+  7 & 1.6 & 4.6 & 7.8 & 10.5 & 14.0 & 11.1 & 15.2 & 16.5 & 10.7 & 8.0 & 879 \\ 
+  8 & 0.7 & 2.6 & 4.3 & 6.8 & 9.0 & 15.5 & 14.6 & 14.9 & 16.7 & 15.0 & 821\\ 
+  9 & 0.9 & 1.7 & 2.1 & 2.9 & 7.1 & 11.2 & 11.5 & 19.1 & 23.7 & 19.9 & 806\\ 
+  10 & 0.1 & 0.6 & 1.8 & 1.6 & 3.7 & 5.0 & 9.4 & 13.9 & 22.4 & 41.4 & 833\\ 
+   \hline
+  Total & 755 &  752 &    765  &   758 &    758   &  764  &   762 &    756  &   757 & 758 &    7585 \\
+   \hline
+\end{tabular}
+\end{table}
+
+
+\begin{table}[ht]
+\centering
+\caption{Transition matrices across deciles of the global score distribution between test 2 and test
+3} 
+\begin{tabular}{rrrrrrrrrrrr}
+\hline
+& & & & & & Test-3\\
+  \hline
+Test-2 & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 & 9 & 10 & Total \\ 
+  \hline
+1 & 40.8 & 22.1 & 15.7 & 9.8 & 5.6 & 2.8 & 1.1 & 1.2 & 0.5 & 0.3 & 642\\ 
+  2 & 15.2 & 23.0 & 20.6 & 16.2 & 11.1 & 6.5 & 4.1 & 2.1 & 1.0 & 0.3 & 631 \\ 
+  3 & 8.8 & 20.4 & 18.9 & 18.7 & 13.8 & 9.1 & 5.1 & 3.7 & 1.1 & 0.5 & 651\\ 
+  4 & 4.3 & 12.0 & 13.7 & 18.3 & 15.5 & 15.0 & 13.1 & 5.2 & 1.6 & 1.3 & 633 \\ 
+  5 & 2.6 & 7.6 & 12.2 & 13.8 & 15.3 & 17.2 & 13.3 & 11.0 & 5.6 & 1.4 & 646\\ 
+  6 & 1.4 & 3.7 & 9.3 & 12.1 & 16.4 & 14.4 & 15.6 & 16.5 & 7.5 & 3.1 & 653\\ 
+  7 & 0.9 & 1.9 & 5.6 & 8.2 & 12.4 & 18.4 & 15.7 & 16.5 & 15.1 & 5.3 & 643\\ 
+  8 & 0.2 & 1.6 & 1.7 & 5.0 & 7.2 & 10.9 & 18.5 & 22.1 & 21.0 & 11.8 & 642\\ 
+  9 & 0.2 & 1.1 & 0.9 & 1.1 & 3.6 & 7.1 & 11.5 & 18.5 & 29.4 & 26.5 & 633\\ 
+  10 & 0.2 & 0.2 & 0.5 & 0.5 & 1.1 & 2.2 & 3.9 & 10.7 & 24.0 & 57.0 & 647\\ 
+   \hline
+  Total & 477 &    599 &    637   &  666  &   656  &   665  &   655  &   691  &   684 &    691  &  6421\\
+  \hline
+\end{tabular}
+\end{table}
+
+\begin{table}[ht]
+\centering
+\caption{Transition matrices across deciles of the global score distribution between test 2 and test
+3(including the mobility of NAs)} 
+\begin{tabular}{rrrrrrrrrrrr}
+\hline
+& & & & & & Test-3\\
+  \hline
+Test-2 & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 & 9 & 10 & NAs \\ 
+  \hline
+1 & 34.20 & 18.54 & 13.19 & 8.22 & 4.70 & 2.35 & 0.91 & 1.04 & 0.39 & 0.26 & 16.19 \\ 
+  2 & 12.53 & 18.93 & 16.97 & 13.32 & 9.14 & 5.35 & 3.39 & 1.70 & 0.78 & 0.26 & 17.62 \\ 
+  3 & 7.41 & 17.30 & 15.99 & 15.86 & 11.70 & 7.67 & 4.29 & 3.12 & 0.91 & 0.39 & 15.34 \\ 
+  4 & 3.53 & 9.95 & 11.39 & 15.18 & 12.83 & 12.43 & 10.86 & 4.32 & 1.31 & 1.05 & 17.15 \\ 
+  5 & 2.23 & 6.41 & 10.34 & 11.65 & 12.96 & 14.53 & 11.26 & 9.29 & 4.71 & 1.18 & 15.45 \\ 
+  6 & 1.17 & 3.12 & 7.94 & 10.29 & 13.93 & 12.24 & 13.28 & 14.06 & 6.38 & 2.60 & 14.97 \\ 
+  7 & 0.78 & 1.56 & 4.68 & 6.89 & 10.40 & 15.34 & 13.13 & 13.78 & 12.61 & 4.42 & 16.38 \\ 
+  8 & 0.13 & 1.31 & 1.44 & 4.19 & 6.02 & 9.16 & 15.58 & 18.59 & 17.67 & 9.95 & 15.97 \\ 
+  9 & 0.13 & 0.91 & 0.78 & 0.91 & 3.00 & 5.87 & 9.53 & 15.27 & 24.28 & 21.93 & 17.36 \\ 
+  10 & 0.13 & 0.13 & 0.39 & 0.39 & 0.91 & 1.83 & 3.26 & 9.00 & 20.21 & 48.11 & 15.65 \\ 
+  NAs & 13.60 & 7.58 & 5.61 & 4.20 & 4.45 & 4.30 & 4.50 & 3.13 & 3.13 & 2.93 & 46.56 \\ 
+   \hline
+\end{tabular}
+\end{table}
+
+
+\begin{table}[ht]
+\centering
+\caption{Transition matrices across deciles of the global score distribution between test 1 and test
+2(including the mobility of NAs)} 
+\begin{tabular}{rrrrrrrrrrrr}
+\hline
+& & & & & & Test-2\\
+  \hline
+Test-1 & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 & 9 & 10 & NAs \\ 
+  \hline
+1 & 23.14 & 10.33 & 7.75 & 3.88 & 2.69 & 1.83 & 1.51 & 0.32 & 0.65 & 0.11 & 47.79 \\ 
+ 2 & 21.90 & 15.74 & 10.70 & 7.67 & 5.15 & 3.43 & 2.52 & 1.01 & 0.81 & 0.10 & 30.98 \\ 
+  3 & 13.74 & 15.26 & 11.90 & 12.99 & 8.33 & 6.06 & 4.76 & 2.49 & 1.52 & 0.22 & 22.73 \\ 
+  4 & 8.80 & 12.46 & 14.97 & 14.14 & 10.26 & 8.48 & 6.81 & 3.87 & 2.51 & 0.84 & 16.86 \\ 
+  5 & 6.12 & 9.73 & 11.74 & 11.43 & 11.33 & 10.93 & 9.43 & 7.22 & 3.71 & 1.71 & 16.65 \\ 
+  6 & 2.66 & 7.28 & 9.36 & 10.75 & 12.60 & 12.72 & 10.98 & 8.55 & 6.82 & 3.58 & 14.68 \\ 
+  7 & 1.37 & 3.91 & 6.74 & 8.98 & 12.01 & 9.57 & 13.09 & 14.16 & 9.18 & 6.84 & 14.16 \\ 
+  8 & 0.63 & 2.21 & 3.68 & 5.88 & 7.77 & 13.34 & 12.61 & 12.82 & 14.39 & 12.92 & 13.76 \\ 
+  9 & 0.76 & 1.53 & 1.85 & 2.51 & 6.22 & 9.81 & 10.14 & 16.79 & 20.83 & 17.45 & 12.10 \\ 
+  10 & 0.10 & 0.51 & 1.54 & 1.33 & 3.17 & 4.30 & 7.98 & 11.87 & 19.14 & 35.31 & 14.74 \\ 
+  NAs & 10.00 & 12.73 & 3.64 & 5.45 & 5.45 & 3.64 & 6.36 & 7.27 & 8.18 & 8.18 & 29.09 \\ 
+   \hline
+\end{tabular}
+\end{table}
+
+\newpage
+
+\subsection{f)COMPARISONS BETWEEN THE GLOBAL TEST SCORES}
+To compare the test scores between January and December, I use two case:
+
+* The Whole population( for comparison of trends across profession)
+
+* Only the part of the population who take the tests in the same year( test 1 in 1997, test 2 in 1999, and test3 in 2002).
+
+We then use t test on the subset of the observations born in January compared to those born in December, and the resulta are displayed in Table- 10 and 11.
+For both the cases there is significance Positive difference in the scores of students born in January than in December,implying that the students born in January perform better than those born in December. This positive difference in scores however falls across the tests. Thus, the difference in performance biased positively towards older students within a year decreases over time, as the students become older. Moreover, as time passes, the confidence intervals widen quite significantly, which means that the 'certainty' of the mean difference declines. This, however, could be due to the lower number of observations as time passes. In between the tests, we can say that the differences are not statistically significant as the confidence intervals overlap, making it difficult to compare.
+Overall, there is a negative trend, where in the difference falls across the subsequent tests. These differences in performance across age cohorts may be explained perhaps due to higher levels of self-confidence or higher motor and cognitive skills due to faster early child development that decrease in importance as time passes. 
+
+# Comparing Evolution between Professions and Birth Months.
+I use the whole population and conduct a t-test using a subset for those students whose parents are professionals and those  who are blue-collar workers. 
+Again, the differences are significant and positive, implying that on an average the kids with parents as executive professionals score higher than the kids with parents as Blue-collar workers.
+However the trend is opposite to what was observed earlier, the gap in the scores for the students with professionals as parents and the others with the blue-collar workers actually diverges and becomes bigger.
+Moreover, since the confidence intervals do not cross, and unlike the age divide, the growth in the divide is statistically significant, this suggests that parental occupation effects become more relevant in explaining differences in child performance as time progresses. The confidence intervals are narrower than those for month birth differences and hardly widen over time. This implies that,
+not only is this effect more relevant, but also, that the occupation effect seems to be estimated with greater precision. Similarly, differences in performance due to parental occupation may be linked to income differences or familial role models and implicit attainment expectations linked to parental educational attainment.
+
+
+# Underestimation of the true effect of relative age differences on test scores
+
+* I work with a subsample for students born within the same year (1991). If I had not selected a single year to compare, I would underestimate the age effect because, in addition to comparing those born at the beginning and end of the same single year, I would also compare those born in December of the previous year and those born a month later
+in January of the following year, thereby comparing individuals who had only one month difference in
+development. Because these students would likely not have significantly different scores systematically, I
+would be underestimating the effect of age cohorts on the test scores. 
+
+* The results may still be negatively biased since students repeating the year have not been accounted for. It is likely that these students are not evenly distributed across month cohorts. Since the results seem to indicate that those born later within the calendar year perform worse in the tests, it seems likely that these students are likelier to repeat the
+year. If these students had not repeated, and therefore, had had an additional year before taking the latter exams, it seems likely that they would have performed worse than they did.
+
+
+
+
+```{r, echo=FALSE,  warning =FALSE}
+sub <-subset(l, l$birthy==1991 & l$year_t1==1997 & l$year_t2==1999 & l$year_t3==2002) 
+
+e<-tidy(t.test(sub$gscore_t1[sub$birthm==1], sub$gscore_t1[sub$birthm==12]))
+
+e1<-tidy(t.test(sub$gscore_t2[sub$birthm==1], sub$gscore_t2[sub$birthm==12]))
+
+w<-tidy(t.test(l$gscore_t1[l$birthm==1], l$gscore_t1[l$birthm==12]))
+w1<-tidy(t.test(l$gscore_t2[l$birthm==1], l$gscore_t2[l$birthm==12]))
+w2<-tidy(t.test(l$gscore_t3[l$birthm==1], l$gscore_t3[l$birthm==12]))
+
+
+v1<-tidy(t.test(l$gscore_t1[l$parent_occ==3], l$gscore_t1[l$parent_occ==6]))
+v2<-tidy(t.test(l$gscore_t2[l$parent_occ==3], l$gscore_t2[l$parent_occ==6]))
+v3<-tidy(t.test(l$gscore_t3[l$parent_occ==3], l$gscore_t3[l$parent_occ==6]))
+
+g<- data.frame(
+  t=c("1","2","3"),
+  a=c("7.34", "6.04","4.74"),
+  u=c(" 8.57"," 7.65"," 5.21"),
+  l=c("6.12","4.42","1.52"),
+  group=c("1","1","1")
+)
+g1<-g<- data.frame(
+  t=c("1","2","3"),
+  a=c("10.36", "11.63","16.21"),
+  u=c(" 11.07","12.51","17.16"),
+  l=c("9.65","10.74","15.25"),
+  group=c("2","2","2")
+)
+
+```
+\begin{table}[ht]
+\centering
+\caption{Significance Test for the differences between the scores of pupils born in January vs. those born in December }
+\begin{tabular}{ccccc}
+  \hline
+Test & Difference & Mean Scores-January & Mean Scores-December & Confidence interval \\ 
+  \hline
+1 & 6.58$^{***}$ & 75.94 & 69.37  & 5.21 - 7.95 \\
+2 & 6.56$^{***}$ & 72.71 & 66.14   & 4.82 - 8.30 \\
+3 & 3.37$^{***}$ & 71.36 & 67.99    & 1.52 - 5.21\\
+   \hline
+\hline \\[-1.8ex] 
+\textit{Note:}  & \multicolumn{1}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
+\end{tabular}
+\end{table}
+
+\begin{table}[ht]
+\centering
+\caption{Significance Test for the differences between the scores of pupils born in January vs. those born in December, for the whole population}
+\begin{tabular}{ccccc}
+  \hline
+Test & Difference & Mean Scores-January & Mean Scores-December  & Confidence interval \\ 
+  \hline
+1 & 7.34$^{***}$ & 72.56 & 65.22 &  6.12 - 8.57 \\ 
+2 & 6.04$^{***}$ & 69.62 & 63.58 &  4.42 - 7.65  \\
+3 & 4.74$^{***}$ & 67.95 & 63.21  & 2.92 - 6.57  \\ 
+   \hline
+\hline \\[-1.8ex] 
+\textit{Note:}  & \multicolumn{1}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\   
+\end{tabular}
+\end{table}
+
+\begin{table}[ht]
+\centering
+\caption{Significance Test for the differences between the scores of pupils born to Professionals vs.those born to Blue Collar workers, for the whole population}
+\begin{tabular}{ccccc}
+  \hline
+Test & Difference & Professionals & Blue Collar Workers & Confidence Interval \\
+  \hline
+1 & 10.36$^{***}$ & 75.71 & 65.36 & 9.65- 11.07\\ 
+2 & 11.63$^{***}$ & 74.45 & 62.82 & 10.74- 12.51\\
+3 & 16.21$^{***}$ & 76.18 & 59.97 & 15.25 - 17.16\\
+   \hline
+\hline \\[-1.8ex] 
+\textit{Note:}  & \multicolumn{1}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
+\end{tabular}
+\end{table}
+
+
+
+\newpage
+
+# EX-2
+\subsection{1) MISSING VALUES}
+* There are no missing values in the plausible values of all the subjects, but there are missing values in the vaiables that is used to compute the plausible values. The way that the plausible values are then calculated is by imputation or a model prediction and thus can be computed even if the student does not respond. This method is however not very clear and questionable.
+
+* In the responses to the questions, there are either correct (1/2), incorrect (0), partially correct (1) as well as missing values (7) and not reached values (8). There are a lot of Missing values across all sections which is in line with the idea that no child has been assigned all of the booklets and  no student gets to answer all of the questions. However, the "Not reached" , means that a student was supposed to answer a question but failed to do so, and this is a missing value in essence as it is not observed, but doesn't take the value NA. On an average the share of this response "8", is small but maybe is an important consideration.
+* In the whole dataset, there are a total of 97629 missing values, which is displayed in the Table- 13. The share of the missing values for Age and Grade is small. There are a lot of missing values in subjective questions or questions about self-efficacy, which leads to partial non-response in the survey. The questionnaire needs an answer to only 2/3rd of the questions (at random), thus the questions which are not answered take the NAs. Since answering a question is just random, the missing values can be assumed to be randomly distributed due to the design of the questionnaire. 
+
+```{r,echo=FALSE, warning =FALSE}
+o<-colSums(is.na(p))
+o<-o/23087*100
+```
+
+\begin{table}[ht]
+\centering
+\caption{Number of missing values per variable in the dataset}
+\begin{tabular}{ccccccccc}
+  \hline
+ Variables & ST06Q01 & SCMAT & ANXMAT  & GRADE & FAMCON & AGE & FAILMAT & INSTMOT \\
+ NAs & 6.49 & 34.94 & 34.95 &  0.82 & 27.92 & 0.13 & 35.01 & 34.68\\ 
+ Variables & MATHEFF &  MATINTFC & PERSEV & OPENPS & SUBNORM & INTMAT & MATBEH & \\
+ NAs & 34.73 & 38.58 & 35.14 & 35.20 & 34.68  & 34.64 & 34.96 &  \\
+   \hline
+\hline \\[-1.8ex] 
+\end{tabular}
+\end{table}
+
+
+```{r,echo=FALSE}
+pisa_config <- list("variables","parameters")
+pisa_config$variables$weightFinal<-"WEIGHT"
+pisa_config$variables$weightBRR <-"W_FSTR"
+pisa_config$parameters$BRRreps <- as.numeric(80) # number of replication weights
+
+#>>> Functions >>>
+
+#>>> Mean estimation for plausible values
+
+fun.pv <- function (pvnames, data, folder = getwd()) {
+ 
+    R.mean <- sapply(pvnames, function(k) sapply(1:pisa_config$parameters$BRRreps, 
+                                                 function(i) weighted.mean(data[[k]], 
+                                                                           data[[paste0(pisa_config$variables$weightBRR,i)]], na.rm = TRUE)))
+    PV.mean <- sapply(pvnames, function(x) weighted.mean(data[[x]], 
+                                                         data[[pisa_config$variables$weightFinal]], na.rm = TRUE))
+    MEAN.m <- mean(PV.mean)
+    cc = 1/20
+    
+    var.mean.w <- mean(sapply(seq_along(pvnames), function(i) cc *sum((R.mean[, i] - PV.mean[i])^2)))
+    
+    var.mean.b <- (1/(length(pvnames) - 1)) * sum(sapply(seq_along(pvnames), function(i) (PV.mean[i] - MEAN.m)^2)) 
+    
+    mean.se <- (var.mean.w + (1 + 1/length(pvnames)) * var.mean.b)^(1/2)
+    
+    LB <- MEAN.m - 1.96*mean.se
+    UB <- MEAN.m + 1.96*mean.se
+    
+    result <- data.frame(Freq = length(data[[pisa_config$variables$weightFinal]]), 
+                         Mean = mean(MEAN.m), s.e. = mean.se, LB = LB, UB = UB)
+    
+    return(round(result, 2))
+}
+
+fun <- function(variable, data) {
+  
+  meanrp <- sapply(1:pisa_config$parameters$BRRreps, function(i) weighted.mean(as.numeric(data[[variable]]), 
+                                                                               data[[paste(pisa_config$variables$weightBRR, i, sep = "")]], 
+                                                                               na.rm = TRUE))
+  meantot <- weighted.mean(as.numeric(data[[variable]]), 
+                           data[[pisa_config$variables$weightFinal]], na.rm = TRUE)
+  
+  meanse <- (0.05 * sum((meanrp - meantot)^2))^(1/2)
+  
+  LB <- meantot - 1.96*meanse
+  UB <- meantot + 1.96*meanse
+  
+  result <- data.frame(Freq = sum(!is.na(data[[variable]])), 
+                       Mean = meantot, s.e. = meanse, LB = LB, UB = UB)
+  return(round(result, 2))
+  
+}
+```
+
+\subsection{2) FUNCTION $fun.pv$ and AVERAGE SCORES BY COUNTRY }
+
+The function fun.pv calculates an estimation for the mean and the standard errors of the plausible
+values. Plausible values are imputed values that resemble individual test scores and have approximately the same distribution as the latent trait being measured. A computational approximation is used to obtain consistent estimates of population characteristics in assessment situations where individuals are administered too few items to allow precise estimates of their ability.
+These values represent random draws from an empirically derived distribution of proficiency values that are conditional on the observed values of the assessment items and the background variables.
+Because of two staged sampling there are complications at deriving the summary statistics for the plausible values and there are certain pointers to keep in mind to understand the computation of the function:
+
+* There is a distinction in the two types of weights: statistic weights and since 80 repetitions are made, we have the 80 different Balanced Repeated Replication Weights, which is used by PISA .
+
+* The imputation of the Plausible values is using the Rasch Model, and the estimation of the standard error for the plausible values is using a process like bootstrapping which uses the creation of a loop, to make a distribution around the mean and then calculates the standard deviation of this distribution as the standard error of the estimate.
+
+* There are thus two variances which we impute in the following steps: one for "within" and the other for "between". An example could be "within a school variance" and then "between different schools variance".
+
+The steps for the function $fun.pv$ are the following:
+
+* We create a function with pvnames as an argument which turns into a vector of plausible values. Using the $Sapply$ ,we apply a function over k pvnames on the 80 weights. Now we start calculating the values we are interested in for our computations.
+
+* $R.Mean$ computes the weighted mean of variable k using the weights weight BRR which is applied on the vector pvnames and replicated 80 times (because $pisa_configparametersBRRreps=80$). So the weighted mean for each element of pvnames is calculated 80 times.
+
+* $PV.Mean$ computes the weighted means for the vector pvnames using a single weight: weightFinal.
+
+* $MEAN.m$ is the average plausible value for each subject and is computed as the mean of the weighted means computed in PV.mean.
+
+* $var.mean.w$ computes the mean sampling variance defined in the problem set as the mean of the 5 variances for each mean computed on a plausible value variable. Thus it gives the sum of each of the squared differences between the plausible values calculated in the 80 replications and the final plausible estimates multiplied by cc = 1/20, since (1/80 x 4 = 1/20), where 4 is the degree of freedom (n-1) and n=5.
+
+* $var.mean.b$ computes the imputation variance defined in the problem set as the “measurement error” variance, equal to 1/4 of the sum of squared difference between the final mean and each of the 5 plausible means.
+
+* $mean.se$ computes the standard error of the final average mean (square root of the mean sampling variance ,given by var.mean.w, and the imputation variance times 1.2). The 1.2 is a result from $(1+ 1/N)$, where N=5(no. of plausible values).
+
+* LB and UB are the lower and upper bound of the final average value at the 95% confidence interval(thus we use 1.96).
+
+* The result gives the data frame which is computed when running the function, which includes the
+frequency, mean, standard error and the 95% confidence interval.
+
+From the tables, the following can be stated:
+
+* Compared to the values arrived at for the countries in focus in the PISA 2012 Results in Focus, the values I get are close(differences in the round-off)
+
+*  Finland has the highest mean average performance for all subjects, just in terms of having the highest mean score. 
+
+* To comment on the statistical significance of the differences in student performance, I plot the confidence intervals(in the following questions as well). If we want to say that the differences between two groups are significant, we should not have our point estimates of one group lying in the Confidence Intervals of the other group. If the Confidence Intervals cross, but then Point estimates dont lie in the other CI, we can also test significance using the t-test.
+Thus, we observe:
+
+For mathematics, the Confidence intervals for Finland and Vietnam cross, and for Norway and France cross, thus, we can say that the difference in the means are statistically insignificant. The mean scores for Finland  as well as Vietnam is higher than for those for France and Norway.
+For reading, the confidence intervals for France, Norway, and Vietnam cross and thus we can say that the difference in the means are statistically insignificant. But, we can conclude from the graph that for Finland the difference with means of the other countries is statistically significant and the mean scores for Finland is higher than that of the other countries.
+For Science, the confidence intervals for France and Norway cross so the mean scores for these countries are not statistically different. But, clearly the mean scores for Finland is higher than the mean scores for Vietnam, France and Norway. Also the mean scores for Vietnam is higher than that of France and Norway.
+
+In general, thus commenting on the ranking among these countries is complicated.
+We get confidence intervals of 5 points upwards or downwards, which is large pointing at the fact that the two-stage stratified sampling method creates larger standard errors. This limits the ability to reliably rank countries. In fact, problems derived from sampling biases limit the possibility to rank countries. 
+Since PISA only tests 15 year-olds still in school (as it aims to test those students who are about to leave school education), the proportion of 15 year-olds in school varies within the OECD and particularly between OECD countries and partner countries (e.g. Vietnam).
+Thus, where 15 year-olds are not overwhelmingly still in school(like Vietnam), the sample of 15 year-olds evaluated by PISA may not be representative of the total population of 15 year-olds, leading to potential over-estimations of achievement and underestimations of inter-country differences.
+Pupils have different levels of skill at different age may not reflect difference in skills but actually differences in the framing of the educational system in that particular country.
+Thus, conceptually it is neither feasible to comment on the ranks nor rational to comment on the comparison as the systematic difference within countries are an important.
+
+
+```{r, echo= FALSE , warning =FALSE, fig.height=3.5}
+pv.math <- c("PV1MATH", "PV2MATH", "PV3MATH", "PV4MATH", "PV5MATH")
+pv.read <- c("PV1READ", "PV2READ", "PV3READ", "PV4READ", "PV5READ")
+pv.scien <- c("PV1SCIE", "PV2SCIE", "PV3SCIE", "PV4SCIE", "PV5SCIE")
+
+Fi_m <- fun.pv(pv.math, p[p$CNT=="Finland", ] , folder= getwd())
+Fr_m <- fun.pv(pv.math, p[p$CNT=="France", ] , folder= getwd())
+No_m <- fun.pv(pv.math, p[p$CNT=="Norway", ] , folder= getwd())
+Vi_m <- fun.pv(pv.math, p[p$CNT=="Viet Nam", ] , folder= getwd())
+
+math <- as.data.frame(rbind(Fi_m, Fr_m, No_m, Vi_m))
+math$Country<-c("Finland","France","Norway","Vietnam")
+math$Subject<-c("Math", "Math", "Math","Math")
+
+Fi_r<-fun.pv(pv.read, p[p$CNT=="Finland", ] , folder= getwd())
+Fr_r<-fun.pv(pv.read, p[p$CNT=="France", ] , folder= getwd())
+No_r<-fun.pv(pv.read, p[p$CNT=="Norway", ] , folder= getwd())
+Vi_r<-fun.pv(pv.read, p[p$CNT=="Viet Nam", ] , folder= getwd())
+reading <- rbind(Fi_r, Fr_r, No_r, Vi_r)
+reading$Country<-c("Finland","France","Norway","Vietnam")
+reading$Subject<-c("Reading","Reading","Reading","Reading")
+
+
+Fi_s <- fun.pv(pv.scien, p[p$CNT=="Finland", ] , folder= getwd())
+Fr_s <- fun.pv(pv.scien, p[p$CNT=="France", ] , folder= getwd())
+No_s <- fun.pv(pv.scien, p[p$CNT=="Norway", ] , folder= getwd())
+Vi_s <- fun.pv(pv.scien, p[p$CNT=="Viet Nam", ] , folder= getwd())
+
+science <- rbind(Fi_s, Fr_s, No_s, Vi_s)
+science$Country<-c("Finland","France","Norway","Vietnam")
+science$Subject<-c("Science", "Science","Science","Science")
+xl<-rbind(math,reading,science)
+
+plotm <- ggplot(xl, aes(x=Country, y=Mean, colour= Subject)) +
+  geom_errorbar(aes(ymin=LB, ymax=UB), width=.2, position = position_dodge(width=0.2)) +
+  geom_line(position = position_dodge(width=0.2)) +
+  geom_point(size=2, shape=21, fill="white", position = position_dodge(width=0.2)) +
+  geom_text(aes(label=Mean),hjust=-0.1, vjust=-0.1) +
+  ggtitle("Average scores by country")
+plotm
+
+```
+\begin{table}[ht]
+\centering
+\caption{Average Student Performance- Mathematics}
+\begin{tabular}{ccccc}
+  \hline
+Country & Frequency & Mean & Standard Error & Confidence Interval \\ 
+  \hline
+Finland & 8829.00 & 518.75 & 1.94 & 514.95 - 522.55 \\ 
+France & 4613.00 & 494.98 & 2.45 & 490.17 - 499.80 \\ 
+Norway & 4686.00 & 489.37 & 2.73 & 484.01 - 494.73 \\ 
+Vietnam & 4959.00 & 511.34 & 4.84 & 501.85 - 520.83 \\ 
+   \hline
+\end{tabular}
+\end{table}
+
+\begin{table}[ht]
+\centering
+\caption{Average Student Performance- Reading}
+\begin{tabular}{ccccc}
+  \hline
+Country & Frequency & Mean & Standard Error & Confidence Interval \\
+  \hline
+Finland & 8829.00 & 524.02 & 2.38 & 519.35 - 528.69 \\ 
+France & 4613.00 & 505.48 & 2.83 & 499.94 - 511.02 \\ 
+Norway & 4686.00 & 503.94 & 3.22 & 497.63 - 510.24 \\ 
+Vietnam & 4959.00 & 508.22 & 4.40 & 499.60 - 516.84 \\ 
+   \hline
+\end{tabular}
+\end{table}
+
+
+\begin{table}[ht]
+\centering
+\caption{Average Student Performance- Science}
+\begin{tabular}{ccccc}
+  \hline
+Country & Frequency & Mean & Standard Error & Confidence Interval \\
+  \hline
+Finland& 8829.00 & 545.44 & 2.20 & 541.13 - 549.75 \\ 
+France & 4613.00 & 498.97 & 2.58 & 493.92 - 504.03 \\ 
+Norway & 4686.00 & 494.52 & 3.09 & 488.47 - 500.58 \\ 
+Vietnam & 4959.00 & 528.42 & 4.31 & 519.97 - 536.88 \\ 
+   \hline
+\end{tabular}
+\end{table}
+
+
+\subsection{3) COMPARISON BY GENDER}
+Following we try to see how the scores vary in relation to gender. We can observe the following from the tables and the graph(of onfidence intervals) :
+
+* For reading there is a clear signifcant difference betweeen the average scores of boys and the girls, where in the girls score better than the boys.
+
+* For Science, the point estimates lie in the other CI, implying that the difference in the mean scores is not significant.
+
+* For Math I do a T-test and find 1.42 which is smaller than 1.96, so we can say that even for Maths there is no significance difference in the test scores for males and females.
+
+Having observed in the previous questions the vast disparities in inter-country performances, it seems likely that gender disparities may be highly influenced by country differences. Thus, it would likely be more informative to examine the gender disparities nationally, taking into account that educational policies are determined nationally and taking into account how initial cultural and educational expectations based on gender influence academic achievement.
+These observations are in line with the Results documented by PISA 2011, which states that the gender gap in student performance can be narrowed considerably as both boys and girls in all countries and economies show that they can succeed in all three subjects. However, an important element is to consider country specific details which I do next.
+
+```{r,echo=FALSE , warning =FALSE, fig.height=3.5}
+m1<-fun.pv(pv.math, p[p$GENDER==1, ] , folder= getwd())
+r1<-fun.pv(pv.read, p[p$GENDER==1, ] , folder= getwd())
+s1<-fun.pv(pv.scien, p[p$GENDER==1, ] , folder= getwd())
+m2<-fun.pv(pv.math, p[p$GENDER==0, ] , folder= getwd())
+r2<-fun.pv(pv.read, p[p$GENDER==0, ] , folder= getwd())
+s2<-fun.pv(pv.scien, p[p$GENDER==0, ] , folder= getwd())
+r3<- rbind(r1,r2)
+m3<- rbind(m1,m2)
+s3<- rbind(s1,s2)
+r3$Gender<- c("Male","Female")
+r3$Subject<-c("Reading", "Reading")
+m3$Gender<- c("Male","Female")
+m3$Subject<-c("Math", "Math")
+s3$Gender<- c("Male","Female")
+s3$Subject<-c("Science", "Science")
+s4<-rbind(m3,r3,s3)
+ggplot(s4, aes(x=Subject, y=Mean, colour= Gender)) +
+  geom_errorbar(aes(ymin=LB, ymax=UB), width=.2, position = position_dodge(width=0.2)) +
+  geom_line(position = position_dodge(width=0.2)) +
+  geom_point(size=2, shape=21, fill="white", position = position_dodge(width=0.2)) +
+  geom_text(aes(label=Mean),hjust=-0.1, vjust=-0.1) +
+  ggtitle("Average scores by gender")
+```
+\begin{table}[ht]
+\centering
+\caption{Scores by gender: Reading}
+\begin{tabular}{ccccc}
+  \hline
+Gender & Freq & Mean & s.e. & Confidence Interval \\ 
+  \hline
+Male  & 11403.00 & 487.91 & 3.18 & 481.69 - 494.14 \\ 
+Female & 11684.00 & 525.37 & 2.58 & 520.33 - 530.42  \\ 
+   \hline
+\end{tabular}
+\end{table}
+
+\begin{table}[ht]
+\centering
+\caption{Scores by gender: Math}
+\begin{tabular}{ccccc}
+  \hline
+Gender & Freq & Mean & s.e. & Confidence Interval \\ 
+  \hline
+Male  & 11403.00 & 508.77 & 3.43 & 502.06 - 515.48  \\ 
+Female  & 11684.00 & 500.44 & 2.88 & 494.80 - 506.08 \\ 
+   \hline
+\end{tabular}
+\end{table}
+
+\begin{table}[ht]
+\centering
+\caption{Scores by gender: Science}
+\begin{tabular}{ccccc}
+  \hline
+Gender & Freq & Mean & s.e. & Confidence Interval \\ 
+  \hline
+Male & 11403.00 & 515.41 & 3.40 & 508.75 - 522.08 \\ 
+Female & 11684.00 & 517.03 & 2.64 & 511.84 - 522.21 \\ 
+   \hline
+\end{tabular}
+\end{table}
+
+\subsection{4) COMPARISON BY COUNTRY AND GENDER}
+The above observation can be better displayed by focusing on the inter-country observations in the differences in mean scores. Thus I plot three graphs with the CIs and the following can be observed:
+
+* MATH: The graph plots shows that Point-estimates for Finland, Norway and Vietnam lie in the other gender's Confidence Interval, so it is that there is not significant difference in the math scores for males and females in these countries. For France, the Confidence Intervals overlap, but doesn't include the point estimates, so I test the results using a t-test which shows that the difference is significant for France with the males scoring statistically more than the females.
+Even this finding is important, because we generalised earlier that math scores are not statistically significant, but actually the difference is significant for France.
+
+* READING: The graph clearly shows that the difference in the mean scores for the females and males is statistically significant as well as the fact that females score higher on an average than males in all the countries. Also, the females in Finland score statistically higher than the females in the other countries. The CI overlap for the males,so such a comparison is not possible.
+
+* SCIENCE: The differences in the science scores is insignifcant for France, Norway and Vietnam. For Finland the differences are statistically significant with the females scoring on an average more than the males.
+This is an important result, since in the previous question, by not talking about country specific data, we miss out important conclusions about the within country gender comparisons and generalise that the score differences in science is not significant, while in actual females score significantly higher than men in Science.
+
+This comparison conceptually makes sense so that country-level characteristics can be observed and policies can be implemented to support the groups that score lower.
+The results for Finland reflects a larger trend occurring
+across developed countries as shown by PISA, where boys are under-performing in comparison to girls: they
+are worse at reading, less likely to attend university, and their advantage in mathematics is shrinking.
+The Actual Results show that the students at the lowest performance percentiles are overwhelmingly male.
+A reason to contextualise this trend might be that, the historical limitations for female students to receive education might have
+contributed to prop up a male lead, but as gender discrimination faltered, female students began to outperform male students. Furthermore, there exists evidence that shows that female students mature cognitively earlier than male students.
+
+```{r,echo=FALSE , warning =FALSE, fig.height=3.5}
+Fi_mM <- fun.pv(pv.math, p[p$CNT=="Finland" & p$GENDER==1, ] , folder= getwd())
+Fr_mM <- fun.pv(pv.math, p[p$CNT=="France" & p$GENDER==1, ] , folder= getwd())
+No_mM <- fun.pv(pv.math, p[p$CNT=="Norway" & p$GENDER==1, ] , folder= getwd())
+Vi_mM <- fun.pv(pv.math, p[p$CNT=="Viet Nam" & p$GENDER==1, ] , folder= getwd())
+
+#bind them together
+math_m <- rbind(Fi_mM, Fr_mM, No_mM, Vi_mM)
+
+Fi_rM <- fun.pv(pv.read, p[p$CNT=="Finland" & p$GENDER==1, ] , folder= getwd())
+Fr_rM <- fun.pv(pv.read, p[p$CNT=="France" & p$GENDER==1, ] , folder= getwd())
+No_rM <- fun.pv(pv.read, p[p$CNT=="Norway" & p$GENDER==1, ] , folder= getwd())
+Vi_rM <- fun.pv(pv.read, p[p$CNT=="Viet Nam" & p$GENDER==1, ] , folder= getwd())
+
+reading_m <- rbind(Fi_rM, Fr_rM, No_rM, Vi_rM)
+
+
+Fi_sM <- fun.pv(pv.scien, p[p$CNT=="Finland" & p$GENDER==1, ] , folder= getwd())
+Fr_sM <- fun.pv(pv.scien, p[p$CNT=="France" & p$GENDER==1, ] , folder= getwd())
+No_sM <- fun.pv(pv.scien, p[p$CNT=="Norway" & p$GENDER==1, ] , folder= getwd())
+Vi_sM <- fun.pv(pv.scien, p[p$CNT=="Viet Nam" & p$GENDER==1, ] , folder= getwd())
+
+science_m <- rbind(Fi_sM, Fr_sM, No_sM, Vi_sM)
+
+
+Fi_mF <- fun.pv(pv.math, p[p$CNT=="Finland" & p$GENDER==0, ] , folder= getwd())
+Fr_mF <- fun.pv(pv.math, p[p$CNT=="France" & p$GENDER==0, ] , folder= getwd())
+No_mF <- fun.pv(pv.math, p[p$CNT=="Norway" & p$GENDER==0, ] , folder= getwd())
+Vi_mF <- fun.pv(pv.math, p[p$CNT=="Viet Nam" & p$GENDER==0, ] , folder= getwd())
+
+math_f <- rbind(Fi_mF, Fr_mF, No_mF, Vi_mF)
+
+
+Fi_rF <- fun.pv(pv.read, p[p$CNT=="Finland" & p$GENDER==0, ] , folder= getwd())
+Fr_rF <- fun.pv(pv.read, p[p$CNT=="France" & p$GENDER==0, ] , folder= getwd())
+No_rF <- fun.pv(pv.read, p[p$CNT=="Norway" & p$GENDER==0, ] , folder= getwd())
+Vi_rF <- fun.pv(pv.read, p[p$CNT=="Viet Nam" & p$GENDER==0, ] , folder= getwd())
+reading_f <- rbind(Fi_rF, Fr_rF, No_rF, Vi_rF)
+
+Fi_sF <- fun.pv(pv.scien, p[p$CNT=="Finland" & p$GENDER==0, ] , folder= getwd())
+Fr_sF <- fun.pv(pv.scien, p[p$CNT=="France" & p$GENDER==0, ] , folder= getwd())
+No_sF <- fun.pv(pv.scien, p[p$CNT=="Norway" & p$GENDER==0, ] , folder= getwd())
+Vi_sF <- fun.pv(pv.scien, p[p$CNT=="Viet Nam" & p$GENDER==0, ] , folder= getwd())
+science_f <- rbind(Fi_sF, Fr_sF, No_sF, Vi_sF)
+
+Finland <- rbind(Fi_mM, Fi_mF, Fi_rM, Fi_rF, Fi_sM, Fi_sF)
+France <- rbind(Fr_mM, Fr_mF, Fr_rM, Fr_rF, Fr_sM, Fr_sF)
+Norway <- rbind(No_mM, No_mF, No_rM, No_rF, No_sM, No_sF)
+Vietnam <- rbind(Vi_mM, Vi_mF, Vi_rM, Vi_rF, Vi_sM, Vi_sF)
+maths_difference <- rbind(Fi_mM, Fi_mF, Fr_mM, Fr_mF, No_mM, No_mF, Vi_mM, Vi_mF)
+Gender <-c("Male", "Female", "Male", "Female", "Male", "Female", "Male", "Female")
+Country <- c("Finland", "Finland", "France", "France", "Norway", "Norway", "Vietnam", "Vietnam")
+maths_difference  <- cbind(maths_difference, Gender, Country)
+plotmath <- ggplot(maths_difference, aes(x=Country, y=Mean, colour=Gender)) +
+  geom_errorbar(aes(ymin=LB, ymax=UB), width=.2, position = position_dodge(width=0.2)) +
+  geom_line(position = position_dodge(width=0.2)) +
+  geom_point(size=2, shape=21, fill="white", position = position_dodge(width=0.2)) +
+  geom_text(aes(label=Mean),hjust=-0.1, vjust=-0.1) +
+  ggtitle("Average scores by gender and country: Maths")
+plotmath
+
+read_difference <- rbind(Fi_rM, Fi_rF, Fr_rM, Fr_rF, No_rM, No_rF, Vi_rM, Vi_rF)
+Gender <-c("Male", "Female", "Male", "Female", "Male", "Female", "Male", "Female")
+Country <- c("Finland", "Finland", "France", "France", "Norway", "Norway", "Vietnam", "Vietnam")
+read_difference  <- cbind(read_difference, Gender, Country)
+plotread <- ggplot(read_difference, aes(x=Country, y=Mean, colour=Gender)) +
+  geom_errorbar(aes(ymin=LB, ymax=UB), width=.2, position = position_dodge(width=0.2)) +
+  geom_line(position = position_dodge(width=0.2)) +
+  geom_point(size=2, shape=21, fill="white", position = position_dodge(width=0.2)) +
+  geom_text(aes(label=Mean),hjust=-0.1, vjust=-0.1) +
+  ggtitle("Average scores by gender and country: Reading")
+plotread
+
+science_difference <- rbind(Fi_sM, Fi_sF, Fr_sM, Fr_sF, No_sM, No_sF, Vi_sM, Vi_sF)
+Gender <-c("Male", "Female", "Male", "Female", "Male", "Female", "Male", "Female")
+Country <- c("Finland", "Finland", "France", "France", "Norway", "Norway", "Vietnam", "Vietnam")
+science_difference  <- cbind(science_difference, Gender, Country)
+plotscience <- ggplot(science_difference, aes(x=Country, y=Mean, colour=Gender)) +
+  geom_errorbar(aes(ymin=LB, ymax=UB), width=.2, position = position_dodge(width=0.2)) +
+  geom_line(position = position_dodge(width=0.2)) +
+  geom_point(size=2, shape=21, fill="white", position = position_dodge(width=0.2)) +
+  geom_text(aes(label=Mean),hjust=-0.1, vjust=-0.1) +
+  ggtitle("Average scores by gender and country: Science")
+plotscience
+
+```
+
+
+\begin{table}[ht]
+\centering
+\caption{Finland}
+\begin{tabular}{cccccc}
+  \hline
+Subject & Gender & Frequency & Mean & Standard Error & Confidence Interval \\ 
+  \hline
+Math & Male & 4459.00 & 517.39 & 2.63 & 512.24 - 522.54 \\ 
+Math & Female & 4370.00 & 520.19 & 2.16 & 515.95 - 524.42 \\ 
+Reading & Male & 4459.00 & 494.01 & 3.15 & 487.84 - 500.17 \\ 
+Reading &  Female &4370.00 & 555.71 & 2.38 & 551.05 - 560.37 \\ 
+Science & Male & 4459.00 & 537.44 & 2.98 & 531.60 - 543.27 \\ 
+Science & Female &4370.00 & 553.89 & 2.28 & 549.42 - 558.37 \\ 
+   \hline
+\end{tabular}
+\end{table}
+
+\begin{table}[ht]
+\centering
+\caption{France}
+\begin{tabular}{cccccc}
+  \hline
+Subject & Gender & Frequency & Mean & Standard Error & Confidence Interval \\ 
+  \hline
+Math & Male  & 2238.00 & 499.35 & 3.41 & 492.67 - 506.04 \\ 
+Math & Female & 2375.00 & 490.85 & 2.55 & 485.86 - 495.85 \\ 
+Reading & Male & 2238.00 & 482.97 & 3.81 & 475.51 - 490.44 \\ 
+Reading & Female & 2375.00 & 526.77 & 3.01 & 520.87 - 532.66 \\ 
+Science & Male & 2238.00 & 497.72 & 3.82 & 490.22 - 505.21 \\ 
+Science & Female & 2375.00 & 500.16 & 2.42 & 495.42 - 504.90 \\ 
+   \hline
+\end{tabular}
+\end{table}
+
+\begin{table}[ht]
+\centering
+\caption{Norway}
+\begin{tabular}{cccccc}
+  \hline
+Subject & Gender & Frequency & Mean & Standard Error & Confidence Interval \\ 
+  \hline
+Math & Male  & 2395.00 & 490.40 & 2.80 & 484.92 - 495.88 \\ 
+Math & Female & 2291.00 & 488.29 & 3.43 & 481.56 - 495.02 \\ 
+Reading & Male & 2395.00 & 481.28 & 3.34 & 474.73 - 487.83 \\ 
+Reading & Female & 2291.00 & 527.77 & 3.86 & 520.20 - 535.34 \\ 
+Science & Male & 2395.00 & 492.79 & 3.22 & 486.49 - 499.10 \\ 
+Science & Female & 2291.00 & 496.35 & 3.74 & 489.02 - 503.67 \\ 
+   \hline
+\end{tabular}
+\end{table}
+
+
+\begin{table}[ht]
+\centering
+\caption{Vietnam}
+\begin{tabular}{cccccc}
+  \hline
+Subject & Gender & Frequency & Mean & Standard Error & Confidence Interval \\
+  \hline
+Math & Male & 2311.00 & 516.64 & 5.57 & 505.72 - 527.55 \\ 
+Math & Female & 2648.00 & 506.74 & 4.65 & 497.62 - 515.86 \\ 
+Reading & Male & 2311.00 & 491.73 & 4.98 & 481.97 - 501.49 \\ 
+Reading & Female & 2648.00 & 522.53 & 3.95 & 514.79 - 530.27 \\ 
+Science & Male & 2311.00 & 528.98 & 5.03 & 519.11 - 538.84 \\ 
+Science & Female & 2648.00 & 527.94 & 4.06 & 519.99 - 535.90 \\ 
+   \hline
+\end{tabular}
+\end{table}
+
+```{r,echo=FALSE , warning =FALSE, fig.height=3.5}
+fin <- fun("SCMAT", p[p$CNT=="Finland" & p$GENDER==0,])
+fr<- fun("SCMAT",p[p$CNT=="France" & p$GENDER==0, ])
+no<-fun("SCMAT",p[p$CNT=="Norway" & p$GENDER==0, ])
+vi<-fun("SCMAT",p[p$CNT=="Viet Nam" & p$GENDER==0,])
+fin1 <- fun("SCMAT", p[p$CNT=="Finland" & p$GENDER==1,])
+fr1<- fun("SCMAT",p[p$CNT=="France" & p$GENDER==1, ])
+no1<-fun("SCMAT",p[p$CNT=="Norway" & p$GENDER==1, ])
+vi1<-fun("SCMAT",p[p$CNT=="Viet Nam" & p$GENDER==1,])
+subjec<- rbind(fin1, fin, fr1, fr, no1, no, vi1, vi)
+Gender <-c("Male", "Female", "Male", "Female", "Male", "Female", "Male", "Female")
+Country <- c("Finland", "Finland", "France", "France", "Norway", "Norway", "Vietnam", "Vietnam")
+subjec<- cbind(subjec, Gender, Country)
+pt <- ggplot(subjec, aes(x=Country, y=Mean, colour=Gender)) +
+  geom_errorbar(aes(ymin=LB, ymax=UB), width=.2, position = position_dodge(width=0.2)) +
+  geom_line(position = position_dodge(width=0.2)) +
+  geom_point(size=2, shape=21, fill="white", position = position_dodge(width=0.2)) +
+  geom_text(aes(label=Mean),hjust=-0.1, vjust=-0.1) +
+  ggtitle("Comparison for Self-Assesment for Boys and Girls")
+
+
+fin_ <- fun("INTMAT", p[p$CNT=="Finland" & p$GENDER==0,])
+fr_<- fun("INTMAT",p[p$CNT=="France" & p$GENDER==0, ])
+no_<-fun("INTMAT",p[p$CNT=="Norway" & p$GENDER==0, ])
+vi_<-fun("INTMAT",p[p$CNT=="Viet Nam" & p$GENDER==0,])
+fin1_ <- fun("INTMAT", p[p$CNT=="Finland" & p$GENDER==1,])
+fr1_<- fun("INTMAT",p[p$CNT=="France" & p$GENDER==1, ])
+no1_<-fun("INTMAT",p[p$CNT=="Norway" & p$GENDER==1, ])
+vi1_<-fun("INTMAT",p[p$CNT=="Viet Nam" & p$GENDER==1,])
+subjec_<- rbind(fin1_, fin_, fr1_, fr_, no1_, no_, vi1_, vi_)
+Gender <-c("Male", "Female", "Male", "Female", "Male", "Female", "Male", "Female")
+Country <- c("Finland", "Finland", "France", "France", "Norway", "Norway", "Vietnam", "Vietnam")
+subjec_<- cbind(subjec_, Gender, Country)
+pt_ <- ggplot(subjec_, aes(x=Country, y=Mean, colour=Gender)) +
+  geom_errorbar(aes(ymin=LB, ymax=UB), width=.2, position = position_dodge(width=0.2)) +
+  geom_line(position = position_dodge(width=0.2)) +
+  geom_point(size=2, shape=21, fill="white", position = position_dodge(width=0.2)) +
+  geom_text(aes(label=Mean),hjust=-0.1, vjust=-0.1) +
+  ggtitle("Comparison for Interest for Boys and Girls")
+
+fin_1 <- fun("ANXMAT", p[p$CNT=="Finland" & p$GENDER==0,])
+fr_1<- fun("ANXMAT",p[p$CNT=="France" & p$GENDER==0, ])
+no_1<-fun("ANXMAT",p[p$CNT=="Norway" & p$GENDER==0, ])
+vi_1<-fun("ANXMAT",p[p$CNT=="Viet Nam" & p$GENDER==0,])
+fin1_2 <- fun("ANXMAT", p[p$CNT=="Finland" & p$GENDER==1,])
+fr1_2<- fun("ANXMAT",p[p$CNT=="France" & p$GENDER==1, ])
+no1_2<-fun("ANXMAT",p[p$CNT=="Norway" & p$GENDER==1, ])
+vi1_2<-fun("ANXMAT",p[p$CNT=="Viet Nam" & p$GENDER==1,])
+subjec_1<- rbind(fin1_2, fin_1, fr1_2, fr_1, no1_2, no_1, vi1_2, vi_1)
+Gender <-c("Male", "Female", "Male", "Female", "Male", "Female", "Male", "Female")
+Country <- c("Finland", "Finland", "France", "France", "Norway", "Norway", "Vietnam", "Vietnam")
+subjec_1<- cbind(subjec_1, Gender, Country)
+pt_1 <- ggplot(subjec_1, aes(x=Country, y=Mean, colour=Gender)) +
+  geom_errorbar(aes(ymin=LB, ymax=UB), width=.2, position = position_dodge(width=0.2)) +
+  geom_line(position = position_dodge(width=0.2)) +
+  geom_point(size=2, shape=21, fill="white", position = position_dodge(width=0.2)) +
+  geom_text(aes(label=Mean),hjust=-0.1, vjust=-0.1) +
+  ggtitle("Comparison for Anxiety for Boys and Girls")
+pt_1
+pt_
+pt
+
+```
+\subsection{5) SELF ASSESSMENT and Defining $fun$ }
+
+The function $fun$ helps generate a summary table for a variable such as the answers to the subjective tests (self-assessment in maths level) in a similar way as the $fun.pv$ does, showing the Frequency, Mean, Standard error and the Lower and the Upper Bounds. However the estimation of mean and the standard error is not the simple case but a procedure arising from the design of the two stage sampling and the consideration of the different weights. It uses the method of replication (80 times in this case) for a unique variable and the weights the function takes are the Balanced Repeated Replication (BRR) weights.
+This method is similar to Bootstrapping which is used in case of weights to compute the standard error, successive samples are taken from given sample and then the standard deviation of the distribution of means of these estimations is the standard error.
+
+To describe what the $fun$ function does, I retrace the steps in the same way as we use for $fun.pv$ :
+
+* The first step is to create the function called “fun” defining the arguments which are the variable and the data.
+
+* The function $meanrp$ replicates the weighted mean of the variable that it computes using $weightBRR$ as weights, 80 times.
+
+* The function $sdrp$ is used to get the standard deviation of the weighted means from the previous step. This is also replicated 80 times.
+
+* The function $meantot$ calculates the weighted mean of the variable using the singular weight- $weightFinal$.
+
+* Since we want to estimate only 1 variable and not 5, there is no need to multiply by the imputation variance i.e. the measurement error. Thus, the only uncertainty present is through the sampling variance. Moreover, in order to calculate the standard error, I take the square root of this sampling variance. The function $meanse$ calculates the standard deviation of the variable.
+
+* The functions LB and UB compute the lower and upper bounds of the estimated mean at the 95% confidence level( we again use 1.96).
+
+
+For the idea of comparing the Self assessment scores in maths for boys and girls, I use the same confidence interval plot to reassert the following observations.
+* In conjunction with the gender-differentiated analysis of the PISA results, the subjective assessment of students of their mathematical anxiety, confidence and interest gives us an interesting picture of the
+gender divide on mathematics. I observe for all countries that boys are comparatively more interested in mathematics, while also being relatively more anxious about their performance in mathematics.
+
+* The self assessment of whether or not you are good at math point at the confidence of the student and this is always negative for girls in all the countries. The Interest in math is also mostly negative for the girls( especially in Finland, France and Norway). These variables are an important measure of why students performing similarly in math, can actually have different perceptions of their abilities.
+
+* Traditionally, the males were deemed to have a higher quantitative skill than the girls. This societal norm has actually built up a pressure in the boys to perform well, while at the same time leading to low confidence among the girls, who in reality now score as well as the boys.While girls perform similarly to boys in mathematics and seem to feel less mathematics related anxiety, it could be the case that their performance may still be hindered by their "fear of mathematics".
+
+Thus to conclude, it is social norms rather performance divergence that drive student perceptions. Moreover, as claimed before, despite the relative similarity in performance, it is quite interesting how male students show a far larger confidence in their mathematical abilities and a more fervent interest in the subject, but are able to be only as good as the girls.
+

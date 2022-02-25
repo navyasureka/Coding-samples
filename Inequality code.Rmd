@@ -1,0 +1,774 @@
+---
+title: "HW-4 Measurement"
+author: "Navya Sureka"
+date: "25/10/2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+\color{blue}
+##  Sampling and outliers
+## (a) In terms of sampling, what are the main limitations of survey data for 
+## measuring inequality?
+\color{black}
+The repeated cross-sectional data takes a different sample of a population over time, and can be used for analysing population or group changes over time or aggregate change over time, but cannot be used to look at individual change. By aggregate change,we refer to changes for
+population groups. If representative samples are present in consecutive years of a survey, we can compare changes in the behavior or circumstances of different groups. For example, we can
+draw conclusions on how levels of inequality have changed over time. However, we cannot deduce how inequality for a given individual has changed over time, as different people form
+our sample in different years. This is problematic, because it is difficult to study the impact of a policy measure that targeted a specific group of individuals and may have resulted in enhancing their conditions.
+
+```{r, include = FALSE, warning =FALSE}
+list.of.packages <- c("tidyverse", "haven", "knitr","broom","stargazer", "dplyr", "foreign", "plyr")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages, repos = "http://cran.us.r-project.org")
+invisible(lapply(list.of.packages, library, character.only = TRUE))
+df<- read.dta("civ_87_08.dta")
+```
+
+\color{blue}
+## (b) Why can it be important to exclude outliers for measuring inequality?
+\color{black}
+We are trying to find out the inequality for the population using a sample, but our sample may have outliers which may not be the case of the population and thus there is need to remove these outliers to make our calculations better representative of the population.
+
+\color{blue}
+## (c) Compute the level of consumption per capita per each household.
+\color{black}
+I use the variable _constot_,which is the variable for the total HouseHold Expenditure, and divide it by the _hhsize_, the household size to get the level of consumption per capita per each household. Instead of the _constot_, we could have used the sum of _exp_food_ and _exp_othr_, also.
+```{r,include = FALSE, warning =FALSE}
+df$consindv <- df$constot/df$hhsize
+summary(df$consindv)
+```
+
+\color{blue}
+## (d) Proposed Transformations: An observation household i is not an outlier 
+## if the following condition holds
+\[ |(Log(PerCapitaCons_{i})- Median(Log(PerCapitaCons))/StandardDeviation(Log(PerCapitaCons)|>3\]
+
+\color{black}
+The following is my code for executing the above transformation and for removing
+the outliers:
+
+```{r, warning =FALSE}
+df$lc<- log (df$consindv)
+m_87<- median(df$lc[df$year == "1987"])
+m_98<- median(df$lc[df$year == "1998"])
+m_08<- median(df$lc[df$year == "2008"])
+s_87<- sd(df$lc[df$year == "1987"])
+s_98<- sd(df$lc[df$year == "1998"])
+s_08<- sd(df$lc[df$year == "2008"])
+
+df.new<- df%>%
+  mutate(z = ifelse (year == "1987", abs((df$lc - m_87)/s_87) ,
+             ifelse (year == "1998", abs((df$lc - m_98)/s_98),
+             ifelse (year == "2008", abs((df$lc - m_08)/s_08),NA
+             ))))%>%
+  mutate(o= ifelse (z<= 3, 1,0))%>%
+  filter(o==1)
+```
+
+
+\color{blue}
+
+## * Why is it suggested to take the logarithm? Why can 3 standard deviations be 
+## deemed rather safe?
+
+\color{black}
+We see that without the logarithmic transformation, we have a skewed distribution(long rightward tail) for individual consumption, and once we take the log of individual consumption we get a more closer to normal distribution.
+Also, the distance 3 standard deviations from the median/mean, can be deemed as safe while removing outliers, because we still retain 99.3% of the data set. In our case( as we see next), we drop 121 observations, leading to retaining close to 99.34% of the total observations.
+```{r, warning =FALSE}
+hist(df$consindv, 
+     breaks=1000,
+     xlim=c(0,5000),
+     main= "Histogram of individual consumption",
+     xlab ="individual consumption" 
+     )
+hist(df$lc,
+     main= "Histogram of log of individual consumption",
+     xlab ="log of individual consumption")
+```
+\color{blue}
+
+## * Why should you use the unweighted median rather than the weighted median 
+## to identify outliers?
+
+\color{black}
+We use unweighted median, instead of the weighted median, because the outliers are in our sample data and not in our population data, and weights actually mostly help to find details of the population from a representative sample. We are dealing with the sample when removing the outliers and therefore there is no need to use the weights.
+
+\color{blue}
+
+
+## * Withdraw these observations from your database. This should not drop more 
+## than 157 observations in total.
+
+\color{black}
+
+The original dataset is df and the new one without the outliers is df.new. The total number of outlier rows dropped is equal to 121.
+
+```{r, warning =FALSE}
+nrow(df)-sum(df.new$o)
+```
+\color{blue}
+## Consumer Price Index and Purchasing Power Parities
+## (a) Compute the budget shares of food and non-food consumption for the 
+## representative households in each region.
+\color{black}
+
+We first adhere to the given representative household definition and filter these households,there are 1180 such households. From the summary for our calculations it is visible that, the mean budget share of food is lower in the south than in the north, and for the budget share of non-food, it is the opposite.
+```{r, warning =FALSE}
+df_r<-df.new%>%
+  mutate(r= ifelse(hhsize==4 & femalehead== "no" & work_farmer== "yes",1,
+            ifelse(hhsize==4 & femalehead== "no" & work_selfem== "yes", 1, 0 )))%>%
+  mutate(bs.food= (exp_food/ constot))%>%
+  mutate(bs.nfood=1-bs.food)%>%
+  mutate(weight= hhsize* popwgt * conspc ) %>%
+  filter(r==1)
+a1<-weighted.mean(df_r$bs.food[df_r$north=="yes" & df_r$year=="1987"],
+                  df_r$weight[df_r$north=="yes" & df_r$year=="1987"] )
+a2<-weighted.mean(df_r$bs.food[df_r$north=="yes" & df_r$year=="1998"],
+                  df_r$weight[df_r$north=="yes" & df_r$year=="1998"] )
+a3<-weighted.mean(df_r$bs.food[df_r$north=="yes" & df_r$year=="2008"],
+                  df_r$weight[df_r$north=="yes" & df_r$year=="2008"] )
+a4<-weighted.mean(df_r$bs.food[df_r$north=="no" & df_r$year=="1987"],
+                  df_r$weight[df_r$north=="no"& df_r$year=="1987"])
+a5<-weighted.mean(df_r$bs.food[df_r$north=="no" & df_r$year=="1998"],
+                  df_r$weight[df_r$north=="no"& df_r$year=="1998"])
+a6<-weighted.mean(df_r$bs.food[df_r$north=="no" & df_r$year=="2008"],
+                  df_r$weight[df_r$north=="no"& df_r$year=="2008"])
+a7<-data.frame(
+  Year=c("1987","1998","2008"),
+  North =c(a1,a2,a3),
+  South =c(a4,a5,a6))
+a7[,-1] <-round(a7[,-1],2)
+
+kable(a7,
+      caption="Year-wise Weighted Average of budget share of food for the Representative Households",
+      align=c("c","c","c"))
+
+  
+
+```
+The weighted averages can also be calculated as below using the _lm_ function, and the results are same.
+```{r, warning =FALSE, results= 'hide'}
+identical(df_r$bs.food,df_r$bdgshr_food)
+df_n<- df_r%>%
+  filter(north=="yes")
+df_s<- df_r%>%
+  filter(north=="no")
+l1<-lm(df_n$bs.food[df_n$year== "1987"]~1,weights= df_n$weight[df_n$year== "1987"])
+l2<-lm(df_n$bs.food[df_n$year== "1998"]~1,weights= df_n$weight[df_n$year== "1998"])
+l3<-lm(df_n$bs.food[df_n$year== "2008"]~1,weights= df_n$weight[df_n$year== "2008"])
+stargazer(l1,l2,l3)
+l4<-lm(df_s$bs.food[df_s$year== "1987"]~1,weights= df_s$weight[df_s$year== "1987"])
+l5<-lm(df_s$bs.food[df_s$year== "1998"]~1,weights= df_s$weight[df_s$year== "1998"])
+l6<-lm(df_s$bs.food[df_s$year== "2008"]~1,weights= df_s$weight[df_s$year== "2008"])
+stargazer(l4,l5,l6)
+```
+
+
+\begin{table}[!htbp] \centering 
+  \caption{Year-wise Weighted Average of budget share of food for the Representative Households in the North} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{3}{c}{\textit{Dependent variable:}} \\ 
+\cline{2-4} 
+\\[-1.8ex] & 1987 & 1998 & 2008\\ 
+\\[-1.8ex] & (1) & (2) & (3)\\ 
+\hline \\[-1.8ex] 
+ Constant & 0.716$^{***}$ & 0.733$^{***}$ & 0.605$^{***}$ \\ 
+  & (0.020) & (0.020) & (0.014) \\ 
+  & & & \\ 
+\hline \\[-1.8ex] 
+Observations & 21 & 72 & 258 \\ 
+\hline 
+\hline \\[-1.8ex] 
+\textit{Note:}  & \multicolumn{3}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
+\end{tabular} 
+\end{table} 
+
+
+\begin{table}[!htbp] \centering 
+  \caption{Year-wise Weighted Average of budget share of food for the Representative Households in the South} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{3}{c}{\textit{Dependent variable:}} \\ 
+\cline{2-4} 
+\\[-1.8ex] & 1987 &  1998 &  2008 \\ 
+\\[-1.8ex] & (1) & (2) & (3)\\ 
+\hline \\[-1.8ex] 
+ Constant & 0.632$^{***}$ & 0.661$^{***}$ & 0.546$^{***}$ \\ 
+  & (0.024) & (0.014) & (0.008) \\ 
+  & & & \\ 
+\hline \\[-1.8ex] 
+Observations & 53 & 178 & 598 \\ 
+\hline 
+\hline \\[-1.8ex] 
+\textit{Note:}  & \multicolumn{3}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
+\end{tabular} 
+\end{table}
+
+
+\color{blue}
+## Show mathematically why you should use these weights, as used above:
+\color{black}
+We need to calculate the budget shares of food and non-food consumption for the representative households in each region.
+Ideally to make calculations representative of the population, we should use;
+
+\[IdealWeight_{BudgetSharesFood} =
+(\sum_{i}^{n}(Weight_{i}*FoodExpenditure_{i}))  / (\sum_{i}^{n}(Weight_{i}*ConsumptionHousehold_{i}))\]
+
+With data available, we can compute: 
+\[\sum_{i}^{n}(Weight_{i}*HouseholdSize_{i}* PercapitaFoodExpenditure_{i})  / \sum_{i}^{n}(Weight_{i}*HouseholdSize_{i}* PercapitaTotalExpenditure_{i})\]
+
+This is equal to :
+
+\[\sum_{i}^{n}(Weight_{i}*HouseholdSize_{i}* (PercapitaFoodExpenditure_{i}/PercapitaTotalExpenditure_{i})*PercapitaTotalExpenditure_{i})\]  \[ / \sum_{i}^{n}(Weight_{i}*Household_size_{i}* PercapitaTotalExpenditure_{i})\]
+
+So the weights we use:
+\[Weights= Weight_{i}*HouseholdSize_{i}*PercapitaTotalExpenditure_{i}\]
+
+
+
+\color{blue}
+## (b) With 1987 as the base year, compute:
+* the Laspeyres CPI for each region.
+* the Paasche CPI for each region.
+
+\color{black}
+
+I use the following formulae, taking 1987 as the base year 
+For the Laspeyres price index, we use the budget share of the base year(1987);
+
+\[LaspeyresNorth_{1998} 
+= (AverageFoodPricesNorth_{1998}/AverageFoodPricesNorth_{1987}* 
+BudgetshareFoodNorth_{1987}) +\]
+\[(AverageNonfoodPricesNorth_{1998}/AverageNonfoodPricesNorth_{1987}* BudgetshareNonfoodNorth_{1987})\]
+
+
+For the Laspeyres price index, we use the budget share of the other year(1998);
+
+\[PaschesNorth_{1998} 
+= (AverageFoodPricesNorth_{1998}/AverageFoodPricesNorth_{1987}* 
+BudgetshareFoodNorth_{1998}) +\] \[(AverageNonfoodPricesNorth_{1998}/AverageNonfoodPricesNorth_{1987}* BudgetshareNonfoodNorth_{1998})\]
+
+We can calculate similarly for all the years and regions. Folllowing is a formula I used (rest can be found in code.)
+```{r,warning =FALSE, results= 'hide'}
+l_n.98<- ((df_n$avprice_food[df_n$year == "1998"]/df_n$avprice_food[df_n$year == "1987"])*
+            df_n$bdgshr_food[df_n$year == "1987"]) + ((df_n$avprice_othr[df_n$year == "1998"]
+                                                      /df_n$avprice_othr[df_n$year =="1987"])
+                                                      * df_n$bdgshr_othr[df_n$year =="1987"])
+p_n.98<- ((df_n$avprice_food[df_n$year == "1998"]/df_n$avprice_food[df_n$year == "1987"])*
+            df_n$bdgshr_food[df_n$year == "1998"]) + ((df_n$avprice_othr[df_n$year == "1998"]
+                                                    /df_n$avprice_othr[df_n$year == "1987"]) 
+                                                      * df_n$bdgshr_othr[df_n$year =="1998"])
+```
+
+```{r, include = FALSE, warning =FALSE, results= 'hide'}
+l_n.87<- ((df_n$avprice_food[df_n$year == "1987"]/df_n$avprice_food[df_n$year == "1987"])* df_n$bdgshr_food[df_n$year == "1987"]) + ((df_n$avprice_othr[df_n$year == "1987"]/df_n$avprice_othr[df_n$year == "1987"])* df_n$bdgshr_othr[df_n$year == "1987"])
+l_n.98<- ((df_n$avprice_food[df_n$year == "1998"]/df_n$avprice_food[df_n$year == "1987"])* df_n$bdgshr_food[df_n$year == "1987"]) + ((df_n$avprice_othr[df_n$year == "1998"]/df_n$avprice_othr[df_n$year == "1987"])* df_n$bdgshr_othr[df_n$year == "1987"])
+l_n.08<-((df_n$avprice_food[df_n$year == "2008"]/df_n$avprice_food[df_n$year == "1987"])* df_n$bdgshr_food[df_n$year == "1987"]) +((df_n$avprice_othr[df_n$year == "2008"]/df_n$avprice_othr[df_n$year == "1987"])* df_n$bdgshr_othr[df_n$year == "1987"])
+l_s.87<- ((df_s$avprice_food[df_s$year == "1987"]/df_s$avprice_food[df_s$year == "1987"])* df_s$bdgshr_food[df_s$year == "1987"]) + ((df_s$avprice_othr[df_s$year == "1987"]/df_s$avprice_othr[df_s$year == "1987"])* df_s$bdgshr_othr[df_s$year == "1987"])
+l_s.98<- ((df_s$avprice_food[df_s$year == "1998"]/df_s$avprice_food[df_s$year == "1987"])* df_s$bdgshr_food[df_s$year == "1987"]) + ((df_s$avprice_othr[df_s$year == "1998"]/df_s$avprice_othr[df_s$year == "1987"])* df_s$bdgshr_othr[df_s$year == "1987"])
+l_s.08<-((df_s$avprice_food[df_s$year == "2008"]/df_s$avprice_food[df_s$year == "1987"])* df_s$bdgshr_food[df_s$year == "1987"]) +((df_s$avprice_othr[df_s$year == "2008"]/df_s$avprice_othr[df_s$year == "1987"])* df_s$bdgshr_othr[df_s$year == "1987"])
+p_n.87<- ((df_n$avprice_food[df_n$year == "1987"]/df_n$avprice_food[df_n$year == "1987"])* df_n$bdgshr_food[df_n$year == "1987"]) + ((df_n$avprice_othr[df_n$year == "1987"]/df_n$avprice_othr[df_n$year == "1987"])* df_n$bdgshr_othr[df_n$year == "1987"])
+p_n.98<- ((df_n$avprice_food[df_n$year == "1998"]/df_n$avprice_food[df_n$year == "1987"])* df_n$bdgshr_food[df_n$year == "1998"]) + ((df_n$avprice_othr[df_n$year == "1998"]/df_n$avprice_othr[df_n$year == "1987"])* df_n$bdgshr_othr[df_n$year == "1998"])
+p_n.08<-((df_n$avprice_food[df_n$year == "2008"]/df_n$avprice_food[df_n$year == "1987"])* df_n$bdgshr_food[df_n$year == "2008"])+ ((df_n$avprice_othr[df_n$year == "2008"]/df_n$avprice_othr[df_n$year == "1987"])* df_n$bdgshr_othr[df_n$year == "2008"])
+p_s.87<- ((df_s$avprice_food[df_s$year == "1987"]/df_s$avprice_food[df_s$year == "1987"])* df_s$bdgshr_food[df_s$year == "1987"]) + ((df_s$avprice_othr[df_s$year == "1987"]/df_s$avprice_othr[df_s$year == "1987"])* df_s$bdgshr_othr[df_s$year == "1987"])
+p_s.98<- ((df_s$avprice_food[df_s$year == "1998"]/df_s$avprice_food[df_s$year == "1987"])* df_s$bdgshr_food[df_s$year == "1998"]) + ((df_s$avprice_othr[df_s$year == "1998"]/df_s$avprice_othr[df_s$year == "1987"])* df_s$bdgshr_othr[df_s$year == "1998"])
+p_s.08<-((df_s$avprice_food[df_s$year == "2008"]/df_s$avprice_food[df_s$year == "1987"])* df_s$bdgshr_food[df_s$year == "2008"])+ ((df_s$avprice_othr[df_s$year == "2008"]/df_s$avprice_othr[df_s$year == "1987"])* df_s$bdgshr_othr[df_s$year == "2008"])
+```
+
+```{r, echo = FALSE, warning =FALSE}
+t.n<- data.frame(
+  Year=c("1987", "1998", "2008"),
+  Laspeyres_CPI_North=c(l_n.87[[1]],l_n.98[[1]],l_n.08[[1]]),
+  Laspeyres_CPI_South=c(l_s.87[[1]],l_s.98[[1]],l_s.08[[1]]),
+  Paasche_CPI_North=c(p_n.87[[1]],p_n.98[[1]], p_n.08[[1]]),
+  Paasche_CPI_South=c(p_s.87[[1]],p_s.98[[1]], p_s.08[[1]])
+)
+t.n[,-1] <-round(t.n[,-1],2)
+kable(t.n,
+      caption ="Laspeyres and Pasche CPI for North and South",
+      align = c("c","c","c","c","c"))
+```
+Usually, if the economy sees inflation, there is a fall in the budget share over time. This results in the Paasche index( which uses the budget share of the current year) to be lower than the Laspeyres index (which uses the budget share of the base year). However, our table shows this to be true for year 1998, but not for 2008. The main downside to these indices is the fact that they do not take into effect the substitution effects. When the price of something rises, we tend to consume less of it. Because the Laspeyres index uses base period quantities, it tends to overestimate inflation by assuming that individuals’ income expense is still distributed in the same way. The opposite is true of the Paasche index: because it uses current period quantities, it underestimates inflation.
+
+\color{blue}
+## (c) Compute a PPP aggregate for the North region with respect to the South. For each year
+## in your dataset, compute:
+* the Laspeyres PPP of Northern Cote d'Ivoire.
+* the Paasche PPP of Northern Cote d'Ivoire.
+* the Fisher PPP of Northern Cote d'Ivoire.
+
+\color{black}
+
+For calculating the PPP with respect to South I use the following formulas:
+\[PPPLaspeyres_{1998} 
+= (AverageFoodPricesNorth_{1998}/AverageFoodPricesSouth_{1998}* 
+BudgetshareFoodSouth_{1998}) +\]
+\[(AverageNonfoodPricesNorth_{1998}/AverageNonfoodPricesSouth_{1998}* BudgetshareNonfoodNorth_{1998})\]
+
+\[PPPPasches_{1998} 
+= (AverageFoodPricesNorth_{1998}/AverageFoodPricesSouth_{1998}* 
+BudgetshareFoodSouth_{1998}) +\] \[(AverageNonfoodPricesNorth_{1998}/AverageNonfoodPricesSouth_{1998}* BudgetshareNonfoodSouth_{1998})\]
+
+\[PPPFisher_{1998} 
+= (PPPLaspeyres_{1998} * PPPPasches_{1998}) ^ {0.5}\]
+
+The code is as following:
+```{r, warning =FALSE}
+ppp_l_98<- ((df_n$avprice_food[df_n$year == "1998"]/
+               df_s$avprice_food[df_s$year == "1998"])* 
+              df_s$bdgshr_food[df_s$year == "1998"]) + 
+  ((df_n$avprice_othr[df_n$year == "1998"]/
+      df_s$avprice_othr[df_s$year == "1998"])* 
+     df_s$bdgshr_othr[df_s$year == "1998"])
+ppp_p_98<- ((df_n$avprice_food[df_n$year == "1998"]/
+               df_s$avprice_food[df_s$year == "1998"])*
+              df_n$bdgshr_food[df_n$year == "1998"]) + 
+  ((df_n$avprice_othr[df_n$year == "1998"]/
+      df_s$avprice_othr[df_s$year == "1998"])* 
+     df_n$bdgshr_othr[df_n$year == "1998"])
+ppp_f_98<- sqrt(ppp_l_98*ppp_p_98)
+
+```
+
+```{r, include = FALSE, warning =FALSE}
+ppp_l_87<- ((df_n$avprice_food[df_n$year == "1987"]/df_s$avprice_food[df_s$year == "1987"])* df_s$bdgshr_food[df_s$year == "1987"]) + ((df_n$avprice_othr[df_n$year == "1987"]/df_s$avprice_othr[df_s$year == "1987"])* df_s$bdgshr_othr[df_s$year == "1987"])
+ppp_l_98<- ((df_n$avprice_food[df_n$year == "1998"]/df_s$avprice_food[df_s$year == "1998"])* df_s$bdgshr_food[df_s$year == "1998"]) + ((df_n$avprice_othr[df_n$year == "1998"]/df_s$avprice_othr[df_s$year == "1998"])* df_s$bdgshr_othr[df_s$year == "1998"])
+ppp_l_08<- ((df_n$avprice_food[df_n$year == "2008"]/df_s$avprice_food[df_s$year == "2008"])* df_s$bdgshr_food[df_s$year == "2008"]) + ((df_n$avprice_othr[df_n$year == "2008"]/df_s$avprice_othr[df_s$year == "2008"])* df_s$bdgshr_othr[df_s$year == "2008"])
+
+ppp_p_87<- ((df_n$avprice_food[df_n$year == "1987"]/df_s$avprice_food[df_s$year == "1987"])* df_n$bdgshr_food[df_n$year == "1987"]) + ((df_n$avprice_othr[df_n$year == "1987"]/df_s$avprice_othr[df_s$year == "1987"])* df_n$bdgshr_othr[df_n$year == "1987"])
+ppp_p_98<- ((df_n$avprice_food[df_n$year == "1998"]/df_s$avprice_food[df_s$year == "1998"])* df_n$bdgshr_food[df_n$year == "1998"]) + ((df_n$avprice_othr[df_n$year == "1998"]/df_s$avprice_othr[df_s$year == "1998"])* df_n$bdgshr_othr[df_n$year == "1998"])
+ppp_p_08<- ((df_n$avprice_food[df_n$year == "2008"]/df_s$avprice_food[df_s$year == "2008"])* df_n$bdgshr_food[df_n$year == "2008"]) + ((df_n$avprice_othr[df_n$year == "2008"]/df_s$avprice_othr[df_s$year == "2008"])* df_n$bdgshr_othr[df_n$year == "2008"])
+
+ppp_f_87<- sqrt(ppp_l_87*ppp_p_87)
+ppp_f_98<- sqrt(ppp_l_98*ppp_p_98)
+ppp_f_08<- sqrt(ppp_l_08*ppp_p_08)
+```
+
+```{r, echo = FALSE, warning =FALSE}
+t.p<- data.frame(
+  Year=c("1987", "1998", "2008"),
+  Laspeyres_PPP=c(ppp_l_87[[1]],ppp_l_98[[1]],ppp_l_08[[1]] ),
+  Paasche_PPP=c(ppp_p_87[[1]],ppp_p_98[[1]],ppp_p_08[[1]]),
+  Fisher_PPP=c(ppp_f_87[[1]],ppp_f_98[[1]],ppp_f_08[[1]]))
+t.p[,-1] <-round(t.p[,-1],2)
+kable(t.p,
+      caption ="PPP for North with reference to the South",
+      align = c("c","c","c"))  
+  
+```
+For the calculated PPPs, we see a trend that for all the years, 
+\[PPP_{Pasche} > PPP_{Fisher} > PPP_{Laspeyres}\]
+The PPP figures calculated by the different measures are not starkly different from each other, but over the years the PPP has fallen meaning that 100 CFA franc in the South could buy worth a bit more in the North in 1987, than in 2008.
+
+\color{blue}
+## Absolute poverty measures
+## Calculate and comment on the poverty headcount rate over time, across regions
+## and at the national level calculated when the poverty threshold of one dollar
+## a day is equivalent to 237 franc CFA 1987.
+\color{black}
+To calculate _conspc_87_, we use the following transformations,
+\[conspc87_{year}= conspc*(100/cpi_{year})\]
+This gives the transformation for the individual consumption at 1987 prices for the specific region. To make the spatial comparison possible, we may need to use the respective PPP,
+\[conspc87_{north}= conspc*(100/72.91)  \]
+\[conspc87_{south}= conspc*(100/100)\]
+\[PPPnorth_{1987}= 72.91\]
+\[PPPsouth_{1987}=100 \]
+
+```{r, warning =FALSE, results= 'hide'}
+df_c<- df.new %>%
+  mutate(conspc_87.t = conspc*(100/cpi)) %>%
+           mutate(conspc_87= ifelse(north == "no", conspc_87.t,
+                                    ifelse(north == "yes", conspc_87.t/0.7291,0)))%>%
+  mutate(poor= ifelse(conspc_87<237, 1,0))%>%
+  mutate(new.weight= hhsize* weight)%>%
+  mutate(hc_rate= poor * new.weight )
+```
+
+For the Headcount Poverty Rates, I use:
+\[ PovertyHeadcountRate= \sum_{i}^{n}(Dummy_{poor} * New.weight)/ \sum_{i}^{n}(New.weight))\]
+\[New.weight_{i}= HouseholdSize_{i}* Weight_{i}\]
+```{r, include = FALSE, warning =FALSE, results= 'hide'}
+p_n.87<-sum(df_c$hc_rate[df_c$north=="yes" & df_c$year=="1987"])/ sum(df_c$new.weight[df_c$north=="yes"& df_c$year=="1987"])
+p_n.98<-sum(df_c$hc_rate[df_c$north=="yes" & df_c$year=="1998"])/ sum(df_c$new.weight[df_c$north=="yes"& df_c$year=="1998"])
+p_n.08<-sum(df_c$hc_rate[df_c$north=="yes" & df_c$year=="2008"])/ sum(df_c$new.weight[df_c$north=="yes"& df_c$year=="2008"])
+
+p_s.87<-sum(df_c$hc_rate[df_c$north=="no"& df_c$year=="1987"])/ sum(df_c$new.weight[df_c$north=="no" & df_c$year=="1987"])
+p_s.98<-sum(df_c$hc_rate[df_c$north=="no"& df_c$year=="1998"])/ sum(df_c$new.weight[df_c$north=="no" & df_c$year=="1998"])
+p_s.08<-sum(df_c$hc_rate[df_c$north=="no"& df_c$year=="2008"])/ sum(df_c$new.weight[df_c$north=="no" & df_c$year=="2008"])
+p_1987<-sum(df_c$hc_rate[df_c$year=="1987"])/sum(df_c$new.weight[df_c$year=="1987"])
+p_1998<-sum(df_c$hc_rate[df_c$year=="1998"])/sum(df_c$new.weight[df_c$year=="1998"])
+p_2008<-sum(df_c$hc_rate[df_c$north=="yes"])/sum(df_c$new.weight[df_c$north=="yes"])
+t1<-data.frame(
+  Year=c("1987","1998", "2008"),
+  National=c(p_1987,p_1998,p_2008),
+  North =c(p_n.87,p_n.98,p_n.08),
+  South=c(p_s.87,p_s.98,p_s.08))
+t1[,-1]<-round(t1[,-1],2)
+```
+
+```{r, echo = FALSE, warning =FALSE}
+kable(t1,
+      caption ="Headcount Poverty Rates Over the Years",
+      align = c("c","c","c","c"))
+```
+The following can be said about the Poverty Rates calculated for the 1$ thresholds:
+
+* Poverty Rates have increased by more than 120% at the National Level for Cote d'Ivoire between 1987 and 2008.
+
+* Poverty rates for the Northern Cote d'Ivoire is higher than the rates for Southern Cote d'Ivoire for 1987 and 2008, while it is higher for  Southern Cote d'Ivoire for 1998.
+
+* For Northern Cote d'Ivoire and Southern Cote d'Ivoire , headcount poverty rates have increased by more than 140% between 1987 and 2008.
+
+
+\color{blue}
+## Calculate and comment on the poverty headcount rate over time, across regions
+## and at the national level calculated when the poverty threshold of two dollar
+## a day is equivalent to 474 franc CFA 1987.
+\color{black}
+
+```{r, echo = FALSE, warning =FALSE}
+df_c<- df_c %>%
+  mutate(newpoor= ifelse(conspc_87<474, 1,0))%>%
+  mutate(newhc_rate= newpoor * new.weight )%>%
+  mutate(newcpi=ifelse(df_c$year=="1987", 100,
+                       ifelse(df_c$year=="1998",192.45,
+                              ifelse(df_c$year=="2008",255.73,0))))
+df_c$new_conspc <- df_c$conspc * 100 / df_c$newcpi 
+df_c<- df_c%>%
+  mutate(n1=ifelse(new_conspc < 237, 1,0))%>%
+  mutate(n2= n1 * new.weight )
+p1_n.87<-sum(df_c$newhc_rate[df_c$north=="yes" & df_c$year=="1987"])/ sum(df_c$new.weight[df_c$north=="yes"& df_c$year=="1987"])
+p1_n.98<-sum(df_c$newhc_rate[df_c$north=="yes" & df_c$year=="1998"])/ sum(df_c$new.weight[df_c$north=="yes"& df_c$year=="1998"])
+p1_n.08<-sum(df_c$newhc_rate[df_c$north=="yes" & df_c$year=="2008"])/ sum(df_c$new.weight[df_c$north=="yes"& df_c$year=="2008"])
+
+p1_s.87<-sum(df_c$newhc_rate[df_c$north=="no"& df_c$year=="1987"])/ sum(df_c$new.weight[df_c$north=="no" & df_c$year=="1987"])
+p1_s.98<-sum(df_c$newhc_rate[df_c$north=="no"& df_c$year=="1998"])/ sum(df_c$new.weight[df_c$north=="no" & df_c$year=="1998"])
+p1_s.08<-sum(df_c$newhc_rate[df_c$north=="no"& df_c$year=="2008"])/ sum(df_c$new.weight[df_c$north=="no" & df_c$year=="2008"])
+p1_1987<-sum(df_c$newhc_rate[df_c$year=="1987"])/sum(df_c$new.weight[df_c$year=="1987"])
+p1_1998<-sum(df_c$newhc_rate[df_c$year=="1998"])/sum(df_c$new.weight[df_c$year=="1998"])
+p1_2008<-sum(df_c$newhc_rate[df_c$north=="yes"])/sum(df_c$new.weight[df_c$north=="yes"])
+
+
+t4<-data.frame(
+  Year=c("1987","1998","2008"),
+  National=c(p1_1987,p1_1998,p1_2008),
+  North=c(p1_n.87,p1_n.98,p1_n.08),
+  South=c(p1_s.87,p1_s.98,p1_s.08))
+t4[,-1]<-round(t4[,-1],2)
+kable(t4,
+      caption ="Headcount Poverty Rates Over the Years(Considering 2$ perday as the poverty threshold)",
+      align = c("c","c","c","c"))
+
+```
+The following can be said about the Poverty Rates calculated for the 2$ thresholds:
+
+* Poverty Rates are higher compared to when the threshold was 1$, which is logical as more people now fall below the higher threshold. 
+
+* However, poverty Rates have increased by 30% at the National Level for Cote d'Ivoire between 1987 and 2008.
+
+* Poverty rates for the Northern Cote d'Ivoire is higher than the rates for Southern Cote d'Ivoire for 1998 and 2008, while it is higher for  Southern Cote d'Ivoire for 1987. This may hint at the fact that in 1987, there were a lot of people in Southern Cote d'Ivoire who were living on perday consumption per captia between $1 \ and $2. 
+
+* For Northern Cote d'Ivoire and Southern Cote d'Ivoire , headcount poverty rates have increased by 40% and 30% respectively between 1987 and 2008.
+
+
+\color{blue}
+## Calculate and comment on the poverty headcount rate over time, across regions
+## and at the national level calculated when the poverty threshold of one dollar
+## a day is equivalent to 237 franc CFA 1987, and we assume that price levels 
+## and preferences do not differ across regions.
+\color{black}
+
+
+```{r, echo = FALSE, warning =FALSE}
+p2_n.87<-sum(df_c$n2[df_c$north=="yes" & df_c$year=="1987"])/ sum(df_c$new.weight[df_c$north=="yes"& df_c$year=="1987"])
+p2_n.98<-sum(df_c$n2[df_c$north=="yes" & df_c$year=="1998"])/ sum(df_c$new.weight[df_c$north=="yes"& df_c$year=="1998"])
+p2_n.08<-sum(df_c$n2[df_c$north=="yes" & df_c$year=="2008"])/ sum(df_c$new.weight[df_c$north=="yes"& df_c$year=="2008"])
+
+p2_s.87<-sum(df_c$n2[df_c$north=="no"& df_c$year=="1987"])/ sum(df_c$new.weight[df_c$north=="no" & df_c$year=="1987"])
+p2_s.98<-sum(df_c$n2[df_c$north=="no"& df_c$year=="1998"])/ sum(df_c$new.weight[df_c$north=="no" & df_c$year=="1998"])
+p2_s.08<-sum(df_c$n2[df_c$north=="no"& df_c$year=="2008"])/ sum(df_c$new.weight[df_c$north=="no" & df_c$year=="2008"])
+p2_1987<-sum(df_c$n2[df_c$year=="1987"])/sum(df_c$new.weight[df_c$year=="1987"])
+p2_1998<-sum(df_c$n2[df_c$year=="1998"])/sum(df_c$new.weight[df_c$year=="1998"])
+p2_2008<-sum(df_c$n2[df_c$north=="yes"])/sum(df_c$new.weight[df_c$north=="yes"])
+
+t7<-data.frame(
+  Year=c("1987","1998","2008"),
+  National=c(p2_1987,p2_1998,p2_2008),
+  North=c(p2_n.87,p2_n.98,p2_n.08),
+  South=c(p2_s.87,p2_s.98,p2_s.08))
+
+t7[,-1]<-round(t7[,-1],2)
+kable(t7,
+      caption ="New Headcount Poverty Rates Over the Years(Considerig 1$ perday as the poverty threshold and same CPI as the South)",
+      align = c("c","c","c","c"))
+```
+
+The following can be said about the Poverty Rates calculated for the newcpi:
+
+* Poverty Rates are higher compared to when the cpi in part(a), which points at that the price indices in the south are higher than in the north, which leads to lowering of the new conspc_87, and results in more people falling under the poverty threshold of $1.
+
+* Poverty Rates have increased by about 170% at the National Level for Cote d'Ivoire between 1987 and 2008(using the new cpi).
+
+* Poverty rates for the Northern Cote d'Ivoire is higher than the rates for Southern Cote d'Ivoire for all the years. 
+
+* For Northern Cote d'Ivoire and Southern Cote d'Ivoire , headcount poverty rates have increased by about 95% and 140% respectively between 1987 and 2008.
+
+
+\color{blue}
+## 4 Growth incidence curves 
+## * Draw the two curves on the same graph.
+\color{black}
+
+To compute this question, I have used _ewcdf_ function from the package _spatstat_ and the function _ddply_ from the package _plyr_.
+I calculate the weighted percentiles for the conspc_87 variable for a each year. Then, since there are multiple observations taking the same percentile value, we need to get a single conspc_87 per percentile.
+I have used the max function to get the highest conspc_87 within each percentile. Then, we calcluate the average growth rates between the two periods:
+
+* 1987-1998, and
+
+* 1998-2008
+
+
+The formula used is:
+
+\[AvgGrowth_{1987-98}=(Pctl.Consum_{1998}/Pctl.Consum_{1987})^{1/11} - 1)*100\]
+\[AvgGrowth_{1998-2008}=(Pctl.Consum_{2008}/Pctl.Consum_{1998})^{1/10} - 1)*100\]
+After we get average growth rates, we just plot the data to get the Growth Incidence Curves:
+
+```{r, include= FALSE, warning =FALSE}
+library(spatstat)
+```
+
+```{r, echo = FALSE, warning =FALSE}
+df_c$pctl[df_c$year=="1987"] <- ceiling(100*ewcdf(df_c$conspc_87[df_c$year=="1987"], w=df_c$new.weight[df_c$year=="1987"]/sum(df_c$new.weight[df_c$year=="1987"]))(df_c$conspc_87[df_c$year=="1987"]))
+df_c$pctl[df_c$year=="1998"] <- ceiling(100*ewcdf(df_c$conspc_87[df_c$year=="1998"], w=df_c$new.weight[df_c$year=="1998"]/sum(df_c$new.weight[df_c$year=="1998"]))(df_c$conspc_87[df_c$year=="1998"]))
+df_c$pctl[df_c$year=="2008"] <- ceiling(100*ewcdf(df_c$conspc_87[df_c$year=="2008"], w=df_c$new.weight[df_c$year=="2008"]/sum(df_c$new.weight[df_c$year=="2008"]))(df_c$conspc_87[df_c$year=="2008"]))
+temp <- ddply(df_c, .(year, pctl), function(x) max(x$conspc_87))
+temp <- rename(temp, c(V1="pctl.consum"))
+g <- temp
+g <- ddply(g, .(pctl), function(x) (x$pctl.consum[x$year==1998]/x$pctl.consum[x$year==1987]))
+g <- rename(g, c(V1="avg.growth87_98"))
+g$avg.growth87_98 <- ((g$avg.growth87_98)^(1/11) - 1)*100
+g1 <- temp
+g1 <- ddply(g1, .(pctl), function(x) (x$pctl.consum[x$year==2008]/x$pctl.consum[x$year==1998]))
+g1<- rename(g1, c(V1="avg.growth98_08"))
+g1$avg.growth98_08 <- ((g1$avg.growth98_08)^(1/10) - 1)*100
+g2<-cbind(g,g1[2])
+```
+
+```{r, warning =FALSE}
+ggplot(g2)+ geom_line(aes(x= pctl, y=avg.growth87_98,colour="1987-1998")) + 
+  geom_line(aes(x= pctl, y=avg.growth98_08,colour="1998-2008")) + 
+  labs(x="Individual Level Consumption Percentiles", y="Average Annual Growth 
+       Rate of Daily Per Capita Consumption", color="Time Period")+ 
+  ggtitle("Growth Incidence Curves for 1987-1998 and 1998-2008") + 
+  theme_classic() + 
+  theme(text= element_text(size=10))
+
+```
+\color{blue}
+
+## * Comment the growth incidence curves in 3 sentences at most.
+
+\color{black}
+
+The Average Annual Growth Rate of Daily Per Capita Consumption stays more or less stable for all the Individual Level Consumption Percentiles in the period 1987-1998, with a dip for the highest percentiles. As all percentiles grow at the same pace, it can be understood that inequality remains more or less constant.
+For the period 1998-2008 the Average Annual Growth Rate of Daily Per Capita Consumption rises steeply for the higher Individual Level Consumption Percentiles, indicatin that the Growth Rate of Daily Per Capita Consumption is higher for the higher percentiles than the lower ones, implying that inequality can enlarge.
+
+\color{blue}
+## * Given the GIC between 1998 and 2008, is inequality likely to fall or rise
+##   in 2008 ? Justify your answer in 2-3 sentences.
+\color{black}
+From the graph it is visible that for the period 1998-2008 the Average Annual Growth Rate of Daily Per Capita Consumption rises steeply for the higher Individual Level Consumption Percentiles, indicating that the gap between the lower and the higher percentile is going to enlarge, leading to more inequality.
+
+\color{blue}
+## 5 Lorenz curves
+## (a) For each of the 3 years, for the North, the South, and Cote d'Ivoire as a
+## whole, compute the Lorenz curves of daily per capita consumption in PPP 1987 
+## franc CFA and draw them on the same graph.
+\color{black}
+
+I have found the cumulative consumption shares, and then used the weighted mean to get the cumulative consumption shares for each percentile for different regions and years to make the Lorenz curve comparisons.
+Note: My dataset for 1987 North lacks the 22nd percentile, and thus it is not possible to get the lorenz curve for 1987 North with the other Northern Lorenz curves. I present the graphs as below, and draw the following conclusions.
+
+```{r, warning =FALSE}
+cvn87 <- subset(df_c, year==1987)
+cvn87 <- cvn87[order(cvn87$conspc_87),]
+cvn87$rank <- 1:nrow(cvn87)
+cvn87$con.shr <- cvn87$conspc_87/sum(cvn87$conspc_87)
+cvn87$c.sum87 <- cumsum(cvn87$con.shr)
+Lor87 <- ddply(cvn87, .(pctl), function(x) weighted.mean(x$c.sum87, x$new.weight)*100)
+Lor87 <- rename(Lor87, c(V1="National_87"))
+```
+
+```{r, echo = FALSE, warning =FALSE}
+cvn98 <- subset(df_c, year==1998)
+cvn98 <- cvn98[order(cvn98$conspc_87),]
+cvn98$rank <- 1:nrow(cvn98)
+cvn98$con.shr <- cvn98$conspc_87/sum(cvn98$conspc_87)
+cvn98$c.sum98 <- cumsum(cvn98$con.shr)
+
+cvn08 <- subset(df_c, year==2008)
+cvn08 <- cvn08[order(cvn08$conspc_87),]
+cvn08$rank <- 1:nrow(cvn08)
+cvn08$con.shr <- cvn08$conspc_87/sum(cvn08$conspc_87)
+cvn08$c.sum08 <- cumsum(cvn08$con.shr)
+
+
+Lor98 <- ddply(cvn98, .(pctl), function(x) weighted.mean(x$c.sum98, x$new.weight)*100)
+Lor98 <- rename(Lor98, c(V1="National_98"))
+Lor08 <- ddply(cvn08, .(pctl), function(x) weighted.mean(x$c.sum08, x$new.weight)*100)
+Lor08 <- rename(Lor08, c(V1="National_08"))
+```
+
+We need to calculate new percentiles for the North and South, and then do the process as above for the different years.
+```{r, warning =FALSE}
+cvn87N <- subset(df_c, df_c$year=="1987" & df_c$north=="yes")
+cvn87N <- cvn87N[order(cvn87N$conspc_87),]
+cvn87N$rank <- 1:nrow(cvn87N)
+cvn87N$con.shr <- cvn87N$conspc_87/sum(cvn87N$conspc_87)
+cvn87N$c.sum87N <- cumsum(cvn87N$con.shr)
+cvn87N$pctlN <- ceiling(100*ewcdf(cvn87N$conspc_87, w=cvn87N$new.weight/sum(cvn87N$new.weight))(cvn87N$conspc_87))
+
+Lor87N <- ddply(cvn87N, .(pctlN), function(x) weighted.mean(x$c.sum87N,x$new.weight)*100)
+Lor87N <- rename(Lor87N, c(V1="North_87"))
+```
+
+```{r, echo = FALSE, warning =FALSE}
+f<-data.frame(
+  pctlN=c(22),
+  North_87=c(3.24)
+)
+Lor87N1<-rbind(Lor87N,f)
+Lor87N1 <- Lor87N1[order(Lor87N1$pctlN),]
+
+cvn87S <- subset(df_c, df_c$year=="1987" & df_c$north=="no")
+cvn87S <- cvn87S[order(cvn87S$conspc_87),]
+cvn87S$rank <- 1:nrow(cvn87S)
+cvn87S$con.shr <- cvn87S$conspc_87/sum(cvn87S$conspc_87)
+cvn87S$c.sum87S <- cumsum(cvn87S$con.shr)
+cvn87S$pctlS <- ceiling(100*ewcdf(cvn87S$conspc_87, w=cvn87S$new.weight/sum(cvn87S$new.weight))(cvn87S$conspc_87))
+Lor87S <- ddply(cvn87S, .(pctlS), function(x) weighted.mean(x$c.sum87S, x$new.weight)*100)
+Lor87S <- rename(Lor87S, c(V1="South_87"))
+cvn98N <- subset(df_c, df_c$year=="1998" & df_c$north=="yes")
+cvn98N <- cvn98N[order(cvn98N$conspc_87),]
+cvn98N$rank <- 1:nrow(cvn98N)
+cvn98N$con.shr <- cvn98N$conspc_87/sum(cvn98N$conspc_87)
+cvn98N$c.sum98N <- cumsum(cvn98N$con.shr)
+cvn98N$pctlN <- ceiling(100*ewcdf(cvn98N$conspc_87, w=cvn98N$new.weight/sum(cvn98N$new.weight))(cvn98N$conspc_87))
+
+Lor98N <- ddply(cvn98N, .(pctlN), function(x) weighted.mean(x$c.sum98N, x$new.weight)*100)
+Lor98N <- rename(Lor98N, c(V1="North_98"))
+
+cvn98S <- subset(df_c, df_c$year=="1998" & df_c$north=="no")
+cvn98S <- cvn98S[order(cvn98S$conspc_87),]
+cvn98S$rank <- 1:nrow(cvn98S)
+cvn98S$con.shr <- cvn98S$conspc_87/sum(cvn98S$conspc_87)
+cvn98S$c.sum98S <- cumsum(cvn98S$con.shr)
+cvn98S$pctlS <- ceiling(100*ewcdf(cvn98S$conspc_87, w=cvn98S$new.weight/sum(cvn98S$new.weight))(cvn98S$conspc_87))
+Lor98S <- ddply(cvn98S, .(pctlS), function(x) weighted.mean(x$c.sum98S, x$new.weight)*100)
+Lor98S <- rename(Lor98S, c(V1="South_98"))
+
+cvn08N <- subset(df_c, df_c$year=="2008" & df_c$north=="yes")
+cvn08N <- cvn08N[order(cvn08N$conspc_87),]
+cvn08N$rank <- 1:nrow(cvn08N)
+cvn08N$con.shr <- cvn08N$conspc_87/sum(cvn08N$conspc_87)
+cvn08N$c.sum08N <- cumsum(cvn08N$con.shr)
+cvn08N$pctlN <- ceiling(100*ewcdf(cvn08N$conspc_87, w=cvn08N$new.weight/sum(cvn08N$new.weight))(cvn08N$conspc_87))
+Lor08N <- ddply(cvn08N, .(pctlN), function(x) weighted.mean(x$c.sum08N, x$new.weight)*100)
+Lor08N <- rename(Lor08N, c(V1="North_08"))
+
+cvn08S <- subset(df_c, df_c$year=="2008" & df_c$north=="no")
+cvn08S <- cvn08S[order(cvn08S$conspc_87),]
+cvn08S$rank <- 1:nrow(cvn08S)
+cvn08S$con.shr <- cvn08S$conspc_87/sum(cvn08S$conspc_87)
+cvn08S$c.sum08S <- cumsum(cvn08S$con.shr)
+cvn08S$pctlS <- ceiling(100*ewcdf(cvn08S$conspc_87, w=cvn08S$new.weight/sum(cvn08S$new.weight))(cvn08S$conspc_87))
+Lor08S <- ddply(cvn08S, .(pctlS), function(x) weighted.mean(x$c.sum08S, x$new.weight)*100)
+Lor08S <- rename(Lor08S, c(V1="South_08"))
+
+
+lorenz<-cbind(Lor87,Lor87S[2],Lor98[2],Lor98N[2],Lor98S[2],Lor08[2],Lor08N[2],Lor08S[2])
+
+ggplot(lorenz)+ geom_line(aes(x= pctl, y=National_87,colour="1987")) +geom_line(aes(x= pctl, y=National_98,colour="1998"))+geom_line(aes(x= pctl,  y=National_08, colour="2008")) +geom_abline(slope=1,intercept=0,linetype="dashed") + labs(x="Cummulative % Population (from Poorest to Richest)", y="Cummulative %  Daily Per Capita Consumption", color="Year")+ggtitle("Lorenz Curves at the National level") + theme_classic() + theme(text= element_text(size=10),plot.title=element_text(hjust=0.5))
+
+ggplot(lorenz)+ geom_line(aes(x= pctl, y=North_98,colour="1998")) +geom_line(aes(x= pctl,  y=North_08, colour="2008")) +geom_abline(slope=1,intercept=0,linetype="dashed") + labs(x="Cummulative % Population (from Poorest to Richest)", y="Cummulative %  Daily Per Capita Consumption", color="Year")+ggtitle("Lorenz Curves for the Nothern Cote d'Ivoire") + theme_classic() + theme(text= element_text(size=10),plot.title=element_text(hjust=0.5))
+
+ggplot(lorenz)+ geom_line(aes(x= pctl, y=South_87,colour="1987"))+geom_line(aes(x= pctl,  y=South_98, colour="1998")) +geom_line(aes(x= pctl,  y=South_08, colour="2008")) +geom_abline(slope=1,intercept=0,linetype="dashed") + labs(x="Cummulative % Population (from Poorest to Richest)", y="Cummulative %  Daily Per Capita Consumption", color="Year")+ggtitle("Lorenz Curves for the Southern Cote d'Ivoire") + theme_classic() + theme(text= element_text(size=10),plot.title=element_text(hjust=0.5))
+```
+
+For the code for the graph, I used the following
+```{r, warning =FALSE}
+ggplot(Lor87N)+ geom_line(aes(x= pctlN, y=North_87))+
+geom_abline(slope=1,intercept=0,linetype="dashed") + 
+  labs(x="Cummulative % Population (from Poorest to Richest)", y="Cummulative % 
+       Daily Per Capita Consumption")+
+  ggtitle("Lorenz Curve for the Nothern Cote d'Ivoire in 1987") + 
+  theme_classic() + 
+  theme(text= element_text(size=10),plot.title=element_text(hjust=0.5))
+```
+
+\color{blue}
+
+## (b) Do the Lorenz Curves cross?
+
+\color{black}
+
+To find this I take differences between the cumulative shares for corresponding percentiles and see if there is a change of sign, which would imply that the lorenz curves have crossed. 
+To calculate the number of times the crossings happen, I just see the number of time 1 change to 0 or vice versa.
+```{r, echo = FALSE, warning =FALSE}
+cross <- Lor87[1]%>%
+  mutate(dif87_98 = ifelse(Lor87$National_87 - Lor98$National_98> 0, 1, 0))%>%
+  mutate(dif98_08 = ifelse(Lor98$National_98 - Lor08$National_08> 0, 1, 0))%>%
+  mutate(dif87_08 = ifelse(Lor87$National_87 - Lor08$National_08> 0, 1, 0))
+
+cross_s <- Lor87[1]%>%
+mutate(dif87_98 = ifelse(lorenz$South_87 - lorenz$South_98> 0, 1, 0))%>%
+mutate(dif98_08 = ifelse(lorenz$South_98 - lorenz$South_08> 0, 1, 0))%>%
+mutate(dif87_08 = ifelse(lorenz$South_87 - lorenz$South_08> 0, 1, 0)) 
+
+cross_n <- Lor87[1]%>%
+mutate(dif87_98 = ifelse(Lor87N1$North_87 - lorenz$North_98> 0, 1, 0))%>%
+mutate(dif98_08 = ifelse(lorenz$North_98 - lorenz$North_08> 0, 1, 0))%>%
+mutate(dif87_08 = ifelse(Lor87N1$North_87 - lorenz$North_08> 0, 1, 0))
+```
+The National Lorenz curves for 1987 and 1998 cross 3 times:
+
+* between 1st and 2nd cumulative percentile of population,
+
+* between 5th and 6th cumulative percentile of population, and
+
+* between 13th and 14th cumulative percentile of population.
+
+
+The National Lorenz curves for 1987 and 2008  do not cross, while the National Lorenz curves for 1998 and 2008 cross once between the 98th and 99th cumulative percentile of population.
+
+The Lorenz Curves for Northern Cote d'Ivoire for 1987 and 1998 cross 1 time, between 59th and 60th cumulative percentile of population. The other Lorenz Curves for Northern Cote d'Ivoire do not cross.
+
+The Lorenz Curves for Southern Cote d'Ivoire for 1987 and 1998 crosses 7 times, between 1st and 2nd cumulative percentile of population, and 4 times between 76th and 84th cumulative percentile of population, and 2 times in the 90's cumulative percentile of population . The other Lorenz Curves for Southern Cote d'Ivoire do not cross, making it easy to compare the inequality between these years.
+
+For the Lorenz curve comparisons the following can be stated:
+* At the National level, the inequality is higher for 2008, than for 1987(the Lorenz curve is lower for 2008).Also, the inequality is higher for 2008, than for 1998 (the Lorenz curve is lower for 2008, the two curves cross only once at the highest percentiles)
+* Since the National Lorenz curves for 1987 and 1998 cross, it is difficult to conclude about the inequality.
+* For Northern Cote d'Ivoire,the inequality is higher for 2008, than for 1987(the Lorenz curve is lower for 2008).Also, the inequality is higher for 2008, than for 1998 (the Lorenz curve is lower for 2008). Again comparisons between 1987-1998 is difficult because the curves cross each other.
+*For Southern Cote d'Ivoire, as well, inequality is higher for 2008, than for 1987 and 1998.
+The conclusion drawn is that Inequality is unanimously Higher for 2008 at the National, and Regional levels of comparisons.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
